@@ -45,13 +45,16 @@ const exitChat = () => {
 const sendMessage = () => {
   if (inputMessage.value.trim() === '') return;
   const currentTime = new Date();
+  const msh_type=null
   messages.value.push({
     id: Date.now(),
     username: userStore.username,
     content: inputMessage.value,
     time: formatTime(currentTime),
+    is_HTML:is_HTML.value,
+    msh_type:null
   });
-  sendMsgToSocket(Date.now(), userStore.username, inputMessage.value, formatTime(currentTime));
+  sendMsgToSocket(Date.now(), userStore.username, inputMessage.value, formatTime(currentTime),is_HTML.value,msh_type);
   inputMessage.value = '';
 
   scrollToBottom();
@@ -76,12 +79,14 @@ Socket.on("levelChatroom", (data) => {
   scrollToBottom();
 });
 
-const sendMsgToSocket = (id, username, content, time) => {
+const sendMsgToSocket = (id, username, content, time,is_HTML,Type) => {
   Socket.emit("sendMsg", {
     id: id,
     username: username,
     content: content,
-    time: time // 发送格式化后的时间
+    time: time,
+    is_HTML:is_HTML,
+    msg_type:Type
   });
 };
 
@@ -91,6 +96,8 @@ Socket.on("getMsg", (data) => {
     username: data.username,
     content: data.content,
     time: data.time,
+    is_HTML:data.is_HTML,
+    msg_type:data.msg_type
   });
   playaudio()
   scrollToBottom();
@@ -138,7 +145,7 @@ onUnmounted(() => {
 <!--        </div>-->
 <!--        <div class="message-content" v-if="!is_HTML">{{ msg.content }}</div>-->
 <!--        <div class="message-content" v-else v-html="msg.content"></div>-->
-        <Message :msg="msg"></Message>
+        <Message :msg="msg" :is_HTML="is_HTML"></Message>
       </div>
     </div>
     <div class="chat-input-container">
