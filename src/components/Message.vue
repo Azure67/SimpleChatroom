@@ -20,4 +20,12 @@ defineProps({
 .message-username {
   font-weight: bold;
 }
+.message-time {
+  font-size: 12px;
+  color: #888;
+  margin-left: 5px;
+}
+.message {
+  margin-bottom: 10px;
+}
 </style>

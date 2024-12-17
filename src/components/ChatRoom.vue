@@ -1,23 +1,27 @@
 <script setup>
-import { ref, nextTick, onMounted, onUnmounted } from 'vue';
+import { ref, nextTick, onMounted, onUnmounted,watch } from 'vue';
 import { useUserStore } from "@/store/index.js";
 import { useRouter } from "vue-router";
 import io from 'socket.io-client';
 import data from "emoji-mart-vue-fast/data/all.json";
 import "emoji-mart-vue-fast/css/emoji-mart.css";
 import { Picker, EmojiIndex } from "emoji-mart-vue-fast/src";
+import axios from "axios";
 
+const user_button = ref()
 const emojiIndex = new EmojiIndex(data)
 const showEmojiDialog = ref(false)
 const IP = "192.168.149.56";
 const is_HTML = ref(false);
 const router = useRouter();
 const userStore = useUserStore();
-const messages = ref([]);
+const messages = ref(userStore.msgList || []);
 const inputMessage = ref('');
 const messageContainer = ref(null);
-const Socket = io(`http://${IP}:3000`);
+const Socket = io(`http://${IP}:3000/groupChat`);
 const audioDOM = ref(null)
+const userList=ref([])
+const showUserDrawer=ref(false)
 
 const playaudio=()=>{
   audioDOM.value.play();
@@ -38,6 +42,7 @@ const formatTime = (date) => {
 const exitChat = () => {
   userStore.setlogin(false);
   userStore.setname('');
+  userStore.setMsgList([])
   Socket.close();
   router.push('/');
 };
@@ -89,7 +94,10 @@ const sendMsgToSocket = (id, username, content, time,is_HTML,Type) => {
     msg_type:Type
   });
 };
-
+Socket.on("allUser",(data)=>{
+  console.log(data.userList)
+  userList.value=data.userList
+})
 Socket.on("getMsg", (data) => {
   messages.value.push({
     id: data.id,
@@ -111,14 +119,18 @@ const scrollToBottom = () => {
   }
 };
 
+watch(messages,(nv,ov)=>{
+  console.log(nv)
+  userStore.setMsgList(nv)
+},{deep:true})
 onMounted(() => {
   const audioDom = ref(null)
   audioDOM.value=audioDom.value
+
   Socket.emit("newUserJoin", {
     username: userStore.username
   });
 });
-
 onUnmounted(() => {
   Socket.close();
 });
@@ -126,30 +138,25 @@ onUnmounted(() => {
 <template>
   <audio ref="audioDom" src="../../audio/notification-pluck-on-slower-269285.mp3"></audio>
   <div class="chat-container">
-    <!-- 退出按钮 -->
-    <el-button
-        class="exit-button"
-        @click="exitChat"
-    >
-      Exit
-    </el-button>
-
-    <div class="chat-title">
-      Chatroom
-    </div>
+    <span>
+      <el-button class="exit-button" @click="exitChat" text>Exit</el-button>
+      <div class="chat-title">Chatroom</div>
+      <el-button class="user-button" ref="user_button" @click="showUserDrawer=true">{{`当前人数:${userList.length}`}}</el-button>
+      <el-drawer v-model="showUserDrawer">
+        {{userList}}
+      </el-drawer>
+    </span>
     <div class="chat-messages" ref="messageContainer">
-      <!-- 消息列表 -->
       <div class="message" v-for="msg in messages" :key="msg.id">
 <!--        <div class="message-username" v-if="msg.username">-->
 <!--          {{ msg.username }} <span class="message-time">{{ msg.time }}</span>-->
 <!--        </div>-->
 <!--        <div class="message-content" v-if="!is_HTML">{{ msg.content }}</div>-->
 <!--        <div class="message-content" v-else v-html="msg.content"></div>-->
-        <Message :msg="msg" :is_HTML="is_HTML"></Message>
+        <Message :msg="msg"></Message>
       </div>
     </div>
     <div class="chat-input-container">
-      <!-- 输入框 -->
       <el-input
           type="text"
           placeholder="send a message..."
@@ -161,7 +168,6 @@ onUnmounted(() => {
         <Picker :data="emojiIndex" set="apple" @select="insertemoji"></Picker>
       </el-dialog>
       <el-switch v-model="is_HTML" style="margin-right: 10px;" title="渲染HTML信息"></el-switch>
-      <!-- 发送按钮 -->
       <el-button type="primary" @click="sendMessage">Send</el-button>
     </div>
   </div>
@@ -180,7 +186,11 @@ onUnmounted(() => {
   top: 20px;
   left: 20px;
 }
-
+.user-button{
+  position: absolute;
+  top: 20px;
+  right: 20px;
+}
 .chat-title {
   font-size: 24px;
   font-weight: bold;
@@ -208,11 +218,7 @@ onUnmounted(() => {
   align-items: center;
   padding: 10px;
 }
-.message-time {
-  font-size: 12px;
-  color: #888;
-  margin-left: 5px;
-}
+
 .el-input {
   flex: 1;
   margin-right: 10px;

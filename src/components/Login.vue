@@ -52,7 +52,7 @@ const user_register=async ()=>{
   await regformRef.value.validate()
   const username = reguserform.value.username.trim();
   const password = reguserform.value.password.trim();
-  await axios.post(`http://${IP}:3000/checkUserExists```,{
+  await axios.post(`http://${IP}:3000/checkUserExists`,{
     'username':username
   }).then(res=>{
     if(res.data.msg===0){
