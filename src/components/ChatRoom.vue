@@ -1,12 +1,11 @@
 <script setup>
-import { ref, nextTick, onMounted, onUnmounted,watch } from 'vue';
-import { useUserStore } from "@/store/index.js";
-import { useRouter } from "vue-router";
+import {nextTick, onMounted, onUnmounted, ref, watch} from 'vue';
+import {useUserStore} from "@/store/index.js";
+import {useRouter} from "vue-router";
 import io from 'socket.io-client';
 import data from "emoji-mart-vue-fast/data/all.json";
 import "emoji-mart-vue-fast/css/emoji-mart.css";
-import { Picker, EmojiIndex } from "emoji-mart-vue-fast/src";
-import axios from "axios";
+import {EmojiIndex, Picker} from "emoji-mart-vue-fast/src";
 
 const user_button = ref()
 const emojiIndex = new EmojiIndex(data)
@@ -19,13 +18,28 @@ const messages = ref(userStore.msgList || []);
 const inputMessage = ref('');
 const messageContainer = ref(null);
 const Socket = io(`http://${IP}:3000/groupChat`);
-const audioDOM = ref(null)
 const userList=ref([])
 const showUserDrawer=ref(false)
+const userMsgShowList=ref([])
 
-const playaudio=()=>{
-  audioDOM.value.play();
-}
+const getUserCountData = () => {
+  const data = {};
+  messages.value.forEach(value => {
+    if (value.username){
+      if (data.hasOwnProperty(value.username)) {
+        data[value.username].count++;
+      } else {
+        data[value.username] = { count: 1 };
+      }
+    }
+  });
+  userMsgShowList.value = Object.keys(data).map(key => {
+    return {
+      name: key,
+      count: data[key].count
+    };
+  });
+};
 const insertemoji=(emoji)=>{
   inputMessage.value+=emoji.native
 }
@@ -38,7 +52,11 @@ const formatTime = (date) => {
   const seconds = date.getSeconds().toString().padStart(2, '0');
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
-
+function sleep(time) {
+  return new Promise(function (resolve) {
+    setTimeout(resolve, time);
+  });
+}
 const exitChat = () => {
   userStore.setlogin(false);
   userStore.setname('');
@@ -61,7 +79,7 @@ const sendMessage = () => {
   });
   sendMsgToSocket(Date.now(), userStore.username, inputMessage.value, formatTime(currentTime),is_HTML.value,msh_type);
   inputMessage.value = '';
-
+  getUserCountData();
   scrollToBottom();
 };
 
@@ -96,7 +114,14 @@ const sendMsgToSocket = (id, username, content, time,is_HTML,Type) => {
 };
 Socket.on("allUser",(data)=>{
   console.log(data.userList)
+  userList.value.map((value)=>{
+    if (!value){
+      return value
+    }
+  })
   userList.value=data.userList
+  console.log(userList.value)
+  getUserCountData()
 })
 Socket.on("getMsg", (data) => {
   messages.value.push({
@@ -107,8 +132,8 @@ Socket.on("getMsg", (data) => {
     is_HTML:data.is_HTML,
     msg_type:data.msg_type
   });
-  playaudio()
   scrollToBottom();
+  getUserCountData()
 });
 
 const scrollToBottom = () => {
@@ -120,30 +145,33 @@ const scrollToBottom = () => {
 };
 
 watch(messages,(nv,ov)=>{
-  console.log(nv)
   userStore.setMsgList(nv)
 },{deep:true})
 onMounted(() => {
-  const audioDom = ref(null)
-  audioDOM.value=audioDom.value
-
   Socket.emit("newUserJoin", {
     username: userStore.username
   });
+  getUserCountData()
 });
 onUnmounted(() => {
   Socket.close();
 });
 </script>
 <template>
-  <audio ref="audioDom" src="../../audio/notification-pluck-on-slower-269285.mp3"></audio>
   <div class="chat-container">
     <span>
       <el-button class="exit-button" @click="exitChat" text>Exit</el-button>
       <div class="chat-title">Chatroom</div>
       <el-button class="user-button" ref="user_button" @click="showUserDrawer=true">{{`当前人数:${userList.length}`}}</el-button>
       <el-drawer v-model="showUserDrawer">
-        {{userList}}
+        <span style="display: flex; justify-content: space-between; width: 100%;">
+          <el-statistic title="人数" :value="userList.length" style="margin: 0 50px; padding: 20px;font-size: 1.2em;"></el-statistic>
+        <el-statistic title="消息数量" :value="messages.length" style="margin: 0 50px; padding: 20px;font-size: 1.2em;"></el-statistic>
+        </span>
+        <el-table :data="userMsgShowList" :default-sort="{prop:'count',order:'descending'}">
+          <el-table-column prop="name" label="用户名"></el-table-column>
+          <el-table-column prop="count" label="发言次数" sortable></el-table-column>
+        </el-table>
       </el-drawer>
     </span>
     <div class="chat-messages" ref="messageContainer">
@@ -223,4 +251,5 @@ onUnmounted(() => {
   flex: 1;
   margin-right: 10px;
 }
+
 </style>
