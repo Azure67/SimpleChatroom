@@ -21,6 +21,7 @@ const Socket = io(`http://${IP}:3000/groupChat`);
 const userList=ref([])
 const showUserDrawer=ref(false)
 const userMsgShowList=ref([])
+const mention_options=ref([])
 
 const getUserCountData = () => {
   const data = {};
@@ -122,6 +123,13 @@ Socket.on("allUser",(data)=>{
   userList.value=data.userList
   console.log(userList.value)
   getUserCountData()
+  mention_options.value.push(userList.value.map((value)=>{
+    return{
+      label:value,
+      value:value,
+    }
+  }))
+  console.log(mention_options.value[0])
 })
 Socket.on("getMsg", (data) => {
   messages.value.push({
@@ -185,12 +193,13 @@ onUnmounted(() => {
       </div>
     </div>
     <div class="chat-input-container">
-      <el-input
-          type="text"
-          placeholder="send a message..."
-          v-model="inputMessage"
-          @keyup.enter="sendMessage"
-      />
+<!--      <el-input-->
+<!--          type="text"-->
+<!--          placeholder="send a message..."-->
+<!--          v-model="inputMessage"-->
+<!--          @keyup.enter="sendMessage"-->
+<!--      />-->
+      <el-mention v-model="inputMessage" :options="mention_options[0]" @keyup.enter="sendMessage" style="right: 15px"></el-mention>
       <el-button @click="showEmojiDialog=true" style="margin-right: 10px;">emoji</el-button>
       <el-dialog v-model="showEmojiDialog" style="width: 400px">
         <Picker :data="emojiIndex" set="apple" @select="insertemoji"></Picker>
@@ -247,7 +256,7 @@ onUnmounted(() => {
   padding: 10px;
 }
 
-.el-input {
+.el-dialog {
   flex: 1;
   margin-right: 10px;
 }

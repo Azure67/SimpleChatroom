@@ -165,26 +165,12 @@ const user_login=async ()=>{
 }
 .register {
   display: flex;
-  flex-direction: column; /* Stack children vertically */
+  flex-direction: column;
   justify-content: center;
-  align-items: center; /* Center the form and return link horizontally */
+  align-items: center;
 }
-.input-container {
-  display: flex;
-  flex-direction: column; /* This will stack the inputs vertically */
-  justify-content: center;
-  align-items: center; /* This will center the inputs horizontally */
-}
-
 .login-title {
   font-size: 2em;
   text-align: center;
-}
-.button-container{
-  text-align: center;
-}
-.el-input {
-  width: 240px; /* Ensure both inputs have the same width */
-  margin-bottom: 10px; /* Add space between inputs */
 }
 </style>
