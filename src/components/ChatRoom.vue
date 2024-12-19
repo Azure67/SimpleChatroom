@@ -12,6 +12,7 @@ const emojiIndex = new EmojiIndex(data)
 const showEmojiDialog = ref(false)
 const IP = "192.168.149.56";
 const is_HTML = ref(false);
+const aiUserList=ref(['星火大模型'])
 const router = useRouter();
 const userStore = useUserStore();
 const messages = ref(userStore.msgList || []);
@@ -23,6 +24,25 @@ const showUserDrawer=ref(false)
 const userMsgShowList=ref([])
 const mention_options=ref([])
 
+const getMention_options=()=>{
+  userList.value.forEach((value)=>{
+    console.log(value)
+    console.log(userStore.username)
+    if (value!==userStore.username){
+      mention_options.value.push({
+        label:value,
+        value:value,
+      })
+    }
+  })
+  aiUserList.value.forEach((value)=>{
+    mention_options.value.push({
+      label:value,
+      value:value,
+    })
+  })
+  console.log(mention_options.value)
+}
 const getUserCountData = () => {
   const data = {};
   messages.value.forEach(value => {
@@ -69,7 +89,7 @@ const exitChat = () => {
 const sendMessage = () => {
   if (inputMessage.value.trim() === '') return;
   const currentTime = new Date();
-  const msh_type=null
+  let msh_type=null
   messages.value.push({
     id: Date.now(),
     username: userStore.username,
@@ -78,6 +98,11 @@ const sendMessage = () => {
     is_HTML:is_HTML.value,
     msh_type:null
   });
+  aiUserList.value.forEach((value)=>{
+    if (inputMessage.value.startsWith(`@${value}`)){
+      msh_type=4
+    }
+  })
   sendMsgToSocket(Date.now(), userStore.username, inputMessage.value, formatTime(currentTime),is_HTML.value,msh_type);
   inputMessage.value = '';
   getUserCountData();
@@ -123,13 +148,8 @@ Socket.on("allUser",(data)=>{
   userList.value=data.userList
   console.log(userList.value)
   getUserCountData()
-  mention_options.value.push(userList.value.map((value)=>{
-    return{
-      label:value,
-      value:value,
-    }
-  }))
-  console.log(mention_options.value[0])
+  mention_options.value=[]
+  getMention_options()
 })
 Socket.on("getMsg", (data) => {
   messages.value.push({
@@ -199,7 +219,7 @@ onUnmounted(() => {
 <!--          v-model="inputMessage"-->
 <!--          @keyup.enter="sendMessage"-->
 <!--      />-->
-      <el-mention v-model="inputMessage" :options="mention_options[0]" @keyup.enter="sendMessage" style="right: 15px"></el-mention>
+      <el-mention v-model="inputMessage" :options="mention_options" @keyup.enter="sendMessage" style="right: 15px"></el-mention>
       <el-button @click="showEmojiDialog=true" style="margin-right: 10px;">emoji</el-button>
       <el-dialog v-model="showEmojiDialog" style="width: 400px">
         <Picker :data="emojiIndex" set="apple" @select="insertemoji"></Picker>

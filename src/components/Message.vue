@@ -1,11 +1,19 @@
 <script setup>
+import {marked} from 'marked'
 //消息类型
 // 1 文字类型
 // 2 图片类型
 // 3 视频类型
+// 4 请求ai发言
+// 5 ai发言
 defineProps({
   msg:Object,
 })
+const MarkDownToHTML = (content)=>{
+  console.log(content)
+  return marked(content)
+}
+
 </script>
 
 <template>
@@ -13,6 +21,8 @@ defineProps({
     {{ msg.username }} <span class="message-time">{{ msg.time }}</span>
   </div>
   <div class="message-content" v-if="!msg.is_HTML">{{ msg.content }}</div>
+  <div class="message-content" v-else-if="msg.msg_type===5" v-html="MarkDownToHTML">
+  </div>
   <div class="message-content" v-else v-html="msg.content"></div>
 </template>
 
