@@ -1,5 +1,6 @@
 <script setup>
 import {nextTick, onMounted, onUnmounted, ref, watch} from 'vue';
+import {User, Files, UploadFilled, Picture, DocumentAdd} from "@element-plus/icons-vue"
 import {useUserStore} from "@/store/index.js";
 import {useRouter} from "vue-router";
 import io from 'socket.io-client';
@@ -8,9 +9,14 @@ import "emoji-mart-vue-fast/css/emoji-mart.css";
 import {EmojiIndex, Picker} from "emoji-mart-vue-fast/src";
 
 const user_button = ref()
+const FileUpload = ref()
+const PicUpload=ref()
+const PictureList=ref([])
+const FileList=ref([])
 const emojiIndex = new EmojiIndex(data)
 const showEmojiDialog = ref(false)
 const IP = "192.168.149.56";
+const PORT="3000"
 const is_HTML = ref(false);
 const aiUserList=ref(['星火大模型'])
 const router = useRouter();
@@ -18,11 +24,14 @@ const userStore = useUserStore();
 const messages = ref(userStore.msgList || []);
 const inputMessage = ref('');
 const messageContainer = ref(null);
-const Socket = io(`http://${IP}:3000/groupChat`);
+const Socket = io(`http://${IP}:${PORT}/groupChat`);
 const userList=ref([])
 const showUserDrawer=ref(false)
 const userMsgShowList=ref([])
 const mention_options=ref([])
+const showFileDialog=ref(false)
+const showPictureDialogInFileDialog=ref(false)
+const showFileDialogInFIleDialog=ref(false)
 
 const getMention_options=()=>{
   userList.value.forEach((value)=>{
@@ -89,25 +98,86 @@ const exitChat = () => {
 const sendMessage = () => {
   if (inputMessage.value.trim() === '') return;
   const currentTime = new Date();
-  let msh_type=null
+  let msg_type=1
   messages.value.push({
     id: Date.now(),
     username: userStore.username,
     content: inputMessage.value,
     time: formatTime(currentTime),
     is_HTML:is_HTML.value,
-    msh_type:null
+    msg_type:msg_type
   });
   aiUserList.value.forEach((value)=>{
     if (inputMessage.value.startsWith(`@${value}`)){
-      msh_type=4
+      msg_type=4
     }
   })
-  sendMsgToSocket(Date.now(), userStore.username, inputMessage.value, formatTime(currentTime),is_HTML.value,msh_type);
+  sendMsgToSocket(Date.now(), userStore.username, inputMessage.value, formatTime(currentTime),is_HTML.value,msg_type);
   inputMessage.value = '';
   getUserCountData();
   scrollToBottom();
 };
+const fileHandleChange=(file, fileList)=>{
+  if (file.raw.type) {
+    const fileType = file.raw.type;
+    console.log('File type:', fileType);
+  }
+}
+const picHandleChange=(file,fileList)=>{
+  console.log(file)
+  console.log(fileList)
+  if (file.raw.type.startsWith("image")){
+    ElMessage.success("上传成功")
+    PictureList.value=fileList
+  }else {
+    ElMessage.error("只能上传图片类型")
+    PicUpload.value.handleRemove(file)
+  }
+}
+const submitFile=()=>{
+  FileUpload.value?.submit()
+  FileUpload.value?.clearFiles()
+  showFileDialog.value=false
+  showFileDialogInFIleDialog.value=false
+}
+
+const submitPic=()=>{
+  const files = PictureList.value
+  console.log(files);
+  files.forEach((file)=>{
+    if (file.raw.type.startsWith("image")){
+      sendPictures(file)
+    }
+  })
+  PicUpload.value?.clearFiles()
+  showFileDialog.value=false
+  showPictureDialogInFileDialog.value=false
+}
+const picToBase64 = (pic) =>{
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      resolve(e.target.result);
+    };
+    reader.onerror = (e) => {
+      reject(e);
+    };
+    reader.readAsDataURL(pic.raw);
+  });
+}
+const sendPictures =async (file) =>{
+  const base64 =await picToBase64(file)
+  const message = {
+    id:Date.now(),
+    username:userStore.username,
+    content:base64,
+    time:formatTime(new Date()),
+    is_HTML:false,
+    msg_type:2
+  }
+  messages.value.push(message)
+  sendMsgToSocket(message.id,message.username,message.content,message.time,message.is_HTML,message.msg_type);
+}
 
 Socket.on("userjoin", (data) => {
   console.log(`${data.name} joined`);
@@ -171,7 +241,10 @@ const scrollToBottom = () => {
     });
   }
 };
-
+const showFileDialogInFIleDialogfun = () =>{
+  showFileDialogInFIleDialog.value=false
+  ElMessage.error("暂不支持，目前仅可发送图片")
+}
 watch(messages,(nv,ov)=>{
   userStore.setMsgList(nv)
 },{deep:true})
@@ -190,7 +263,7 @@ onUnmounted(() => {
     <span>
       <el-button class="exit-button" @click="exitChat" text>Exit</el-button>
       <div class="chat-title">Chatroom</div>
-      <el-button class="user-button" ref="user_button" @click="showUserDrawer=true">{{`当前人数:${userList.length}`}}</el-button>
+      <el-button class="user-button" ref="user_button" @click="showUserDrawer=true"><el-icon><User /></el-icon>{{`当前人数:${userList.length}`}}</el-button>
       <el-drawer v-model="showUserDrawer">
         <span style="display: flex; justify-content: space-between; width: 100%;">
           <el-statistic title="人数" :value="userList.length" style="margin: 0 50px; padding: 20px;font-size: 1.2em;"></el-statistic>
@@ -220,6 +293,55 @@ onUnmounted(() => {
 <!--          @keyup.enter="sendMessage"-->
 <!--      />-->
       <el-mention v-model="inputMessage" :options="mention_options" @keyup.enter="sendMessage" style="right: 15px"></el-mention>
+      <el-button @click="showFileDialog=true" style="margin-right: 10px;" :icon = "Files"></el-button>
+      <el-dialog v-model="showFileDialog" class="outerDialog" :style="{ height: '500px' }">
+        <div>
+          <el-button @click="showPictureDialogInFileDialog=true" :icon="Picture" class="DialogButton" title="点击发送图片"></el-button>
+        <el-button @click="showFileDialogInFIleDialogfun" class="DialogButton" title="点击发送文件"><el-icon><DocumentAdd /></el-icon></el-button>
+        </div>
+        <div>
+          <p>
+            <span class="DialogText">发送图片</span>
+            <span class="DialogText">发送视频/文件</span>
+          </p>
+        </div>
+        <el-dialog v-model="showPictureDialogInFileDialog" >
+          <el-upload
+              class="upload-demo"
+              ref="PicUpload"
+              drag
+              :action="`http://${IP}:${PORT}/upload`"
+              :auto-upload="false"
+              :on-change="picHandleChange"
+              :file-list="PictureList"
+              multiple
+          >
+            <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+            <div class="el-upload__text">
+              Drop file here or <em>click to upload</em>
+            </div>
+          </el-upload>
+          <el-button @click="submitPic" type="success">上传图片</el-button>
+        </el-dialog>
+        <el-dialog v-model="showFileDialogInFIleDialog">
+          <el-upload
+              ref="FileUpload"
+              class="upload-demo"
+              drag
+              :action="`http://${IP}:${PORT}/upload`"
+              :on-change="fileHandleChange"
+              :auto-upload="false"
+              :file-list="FileList"
+              multiple
+          >
+            <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+            <div class="el-upload__text">
+              Drop file here or <em>click to upload</em>
+            </div>
+          </el-upload>
+          <el-button @click="submitFile" type="success">上传视频/文件</el-button>
+        </el-dialog>
+      </el-dialog>
       <el-button @click="showEmojiDialog=true" style="margin-right: 10px;">emoji</el-button>
       <el-dialog v-model="showEmojiDialog" style="width: 400px">
         <Picker :data="emojiIndex" set="apple" @select="insertemoji"></Picker>
@@ -276,9 +398,23 @@ onUnmounted(() => {
   padding: 10px;
 }
 
-.el-dialog {
-  flex: 1;
-  margin-right: 10px;
+.outerDialog {
+  width: 100%;
+  height: 300px;
+  padding: 20px;
 }
-
+.DialogButton {
+  text-align: left;
+  width: 150px;
+  height: 150px;
+  font-size: 40px;
+  margin-left:180px;
+  margin-top: 100px;
+}
+.DialogText{
+  text-align: left;
+  font-size: 20px;
+  margin-left:220px;
+  margin-top: 40px;
+}
 </style>

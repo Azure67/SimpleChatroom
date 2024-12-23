@@ -105,7 +105,12 @@ const user_login=async ()=>{
       userStore.setname(username)
       userStore.setlogin(true)
       router.push('/chat')
-    }else {
+    }else if(res.data.msg===2){
+      ElMessage({
+        message:'该用户已登录',
+        type:'error'
+      })
+    } else {
       ElMessage({
         message: '登录失败，账号或密码错误',
         type: 'error',
