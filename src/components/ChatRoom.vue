@@ -118,10 +118,10 @@ const sendMessage = () => {
   scrollToBottom();
 };
 const fileHandleChange=(file, fileList)=>{
-  if (file.raw.type) {
-    const fileType = file.raw.type;
-    console.log('File type:', fileType);
+  if (file.raw.type.startsWith("image")) {
+    ElMessage.error("不能上传图片")
   }
+  FileList.value=fileList
 }
 const picHandleChange=(file,fileList)=>{
   console.log(file)
@@ -135,12 +135,50 @@ const picHandleChange=(file,fileList)=>{
   }
 }
 const submitFile=()=>{
-  FileUpload.value?.submit()
+  console.log(FileList.value)
+  FileList.value.forEach((file)=>{
+    if (!file.raw.type.startsWith("image")){
+      sendVideoOrFile(file)
+    }else {
+      ElMessage.error("包含图片文件！")
+    }
+  })
   FileUpload.value?.clearFiles()
   showFileDialog.value=false
   showFileDialogInFIleDialog.value=false
 }
-
+const sendVideoOrFile=(file)=>{
+  console.log(file.raw.name)
+  const ftime = Date.now()
+  const reader = new FileReader();
+  reader.onload=(event)=>{
+    let fileMsg={
+      id:ftime,
+      username:userStore.username,
+      file:event.target.result,
+      time:formatTime(new Date()),
+      fileSaveName:userStore.username+ftime+file.raw.name,
+      fileShowName:file.raw.name,
+      fileSize:file.raw.size,
+      is_HTML:false,
+      msg_type:file.raw.type.startsWith("video") ? 6 : 3
+    }
+    messages.value.push(fileMsg)
+    console.log(fileMsg)
+    Socket.emit('sendFileToSocket',fileMsg,(response)=>{
+      console.log(response.message)
+      if (response.message==="failed"){
+        ElMessage.error("发送错误")
+      }else {
+        ElMessage.success("发送成功")
+      }
+    })
+  }
+  reader.onerror = (error) => {
+    console.error('Error reading file', error);
+  };
+  reader.readAsArrayBuffer(file.raw)
+}
 const submitPic=()=>{
   const files = PictureList.value
   console.log(files);
@@ -177,8 +215,22 @@ const sendPictures =async (file) =>{
   }
   messages.value.push(message)
   sendMsgToSocket(message.id,message.username,message.content,message.time,message.is_HTML,message.msg_type);
+  scrollToBottom()
 }
-
+const downloadFile = (fileSaveName,fileShowName) =>{
+  Socket.emit("downloadFile",fileSaveName,fileShowName)
+}
+Socket.on('downloadFile', (fileBuffer,fileShowName) => {
+  const blob = new Blob([fileBuffer], { type: 'application/octet-stream' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = fileShowName;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+});
 Socket.on("userjoin", (data) => {
   console.log(`${data.name} joined`);
   messages.value.push({
@@ -222,18 +274,17 @@ Socket.on("allUser",(data)=>{
   getMention_options()
 })
 Socket.on("getMsg", (data) => {
-  messages.value.push({
-    id: data.id,
-    username: data.username,
-    content: data.content,
-    time: data.time,
-    is_HTML:data.is_HTML,
-    msg_type:data.msg_type
-  });
+  messages.value.push(data);
   scrollToBottom();
   getUserCountData()
 });
-
+Socket.on('undefineClient',()=>{
+  ElMessage.error("账号登录凭证失效,请重新登录");
+  userStore.setlogin(false);
+  userStore.setname('');
+  userStore.setMsgList([]);
+  router.push('/');
+})
 const scrollToBottom = () => {
   if (messageContainer.value) {
     nextTick(() => {
@@ -241,10 +292,6 @@ const scrollToBottom = () => {
     });
   }
 };
-const showFileDialogInFIleDialogfun = () =>{
-  showFileDialogInFIleDialog.value=false
-  ElMessage.error("暂不支持，目前仅可发送图片")
-}
 watch(messages,(nv,ov)=>{
   userStore.setMsgList(nv)
 },{deep:true})
@@ -282,7 +329,7 @@ onUnmounted(() => {
 <!--        </div>-->
 <!--        <div class="message-content" v-if="!is_HTML">{{ msg.content }}</div>-->
 <!--        <div class="message-content" v-else v-html="msg.content"></div>-->
-        <Message :msg="msg"></Message>
+        <Message @downloadFile="downloadFile" :msg="msg"></Message>
       </div>
     </div>
     <div class="chat-input-container">
@@ -297,7 +344,7 @@ onUnmounted(() => {
       <el-dialog v-model="showFileDialog" class="outerDialog" :style="{ height: '500px' }">
         <div>
           <el-button @click="showPictureDialogInFileDialog=true" :icon="Picture" class="DialogButton" title="点击发送图片"></el-button>
-        <el-button @click="showFileDialogInFIleDialogfun" class="DialogButton" title="点击发送文件"><el-icon><DocumentAdd /></el-icon></el-button>
+        <el-button @click="showFileDialogInFIleDialog=true" class="DialogButton" title="点击发送文件"><el-icon><DocumentAdd /></el-icon></el-button>
         </div>
         <div>
           <p>
@@ -339,7 +386,7 @@ onUnmounted(() => {
               Drop file here or <em>click to upload</em>
             </div>
           </el-upload>
-          <el-button @click="submitFile" type="success">上传视频/文件</el-button>
+          <el-button @click="submitFile">上传视频/文件</el-button>
         </el-dialog>
       </el-dialog>
       <el-button @click="showEmojiDialog=true" style="margin-right: 10px;">emoji</el-button>

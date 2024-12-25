@@ -8,43 +8,51 @@ import {ref} from 'vue'
 // 4 向ai提问
 // 5 ai发言
 // 6 视频类型
-defineProps({
+const IP = "192.168.149.56";
+const PORT="3000"
+const props = defineProps({
   msg:Object,
 })
-
+const emit = defineEmits(['downloadFile'])
 const showImageViewer = ref(false)
 // MarkDown转Html未完成，暂时搁置
 const MarkDownToHTML = (content)=>{
   console.log(content)
   return marked(content)
 }
+const downloadFile = () =>{
+  emit('downloadFile',props.msg.fileSaveName,props.msg.fileShowName)
+}
 </script>
 
 <template>
-  <div class="message-username" v-if="msg.username">
-    {{ msg.username }} <span class="message-time">{{ msg.time }}</span>
+  <div class="message-username" v-if="props.msg.username">
+    {{ props.msg.username }} <span class="message-time">{{ props.msg.time }}</span>
   </div>
-  <div class="message-content" v-if="msg.msg_type===1">{{ msg.content }}</div>
-  <div class="message-content" v-else-if="msg.msg_type===2">
+  <div class="message-content" v-if="props.msg.msg_type===1">{{ props.msg.content }}</div>
+  <div class="message-content" v-else-if="props.msg.msg_type===2">
     <el-image
-        :src="msg.content"
+        :src="props.msg.content"
         lazy
         class="thumbnail"
-        :preview-src-list="[msg.content]"
+        :preview-src-list="[props.msg.content]"
         @click="showImageViewer=true"
     ></el-image>
   </div>
-  <div class="message-content" v-else-if="msg.msg_type===3">
+  <div class="message-content" v-else-if="props.msg.msg_type===3" @click="downloadFile">
     <div class="file">
       <div class="file-icon"></div>
       <div class="file-info">
-        <span class="file-name">ea.txt</span>
-        <span class="file-size">66B</span>
+        <span class="file-name">{{props.msg.fileShowName}}</span>
+        <span class="file-size">{{ `${props.msg.fileSize}B` }}</span>
       </div>
     </div>
   </div>
-  <div class="message-content" v-else-if="msg.msg_type===5" v-html="msg.content"></div>
-  <div class="message-content" v-else v-html="msg.content"></div>
+  <div class="message-content" v-else-if="props.msg.msg_type===5" v-html="props.msg.content"></div>
+  <div class="message-content" v-else-if="props.msg.msg_type===6">
+    <video :src="`http://${IP}:${PORT}/${props.msg.fileSaveName}`" controls></video>
+  </div>
+  <div class="message-content" v-else v-html="props.msg.content"></div>
 </template>
 
 <style scoped>
