@@ -1,6 +1,6 @@
 <script setup>
 import {marked} from 'marked'
-import {ref} from 'vue'
+import {ref, watch} from 'vue'
 //消息类型
 // 1 文字类型
 // 2 图片类型
@@ -15,6 +15,18 @@ const props = defineProps({
 })
 const emit = defineEmits(['downloadFile'])
 const showImageViewer = ref(false)
+const videoUrl = ref('')
+
+watch(() => props.msg.progress, (newVal) => {
+  if(props.msg.msg_type === 6 && newVal === 100) {
+    videoUrl.value = `http://${IP}:${PORT}/${props.msg.fileSaveName}`
+  }
+})
+
+if(props.msg.msg_type === 6 && (!props.msg.progress || props.msg.progress === 100)) {
+  videoUrl.value = `http://${IP}:${PORT}/${props.msg.fileSaveName}`
+}
+
 // MarkDown转Html未完成，暂时搁置
 const MarkDownToHTML = (content)=>{
   console.log(content)
@@ -35,8 +47,10 @@ const downloadFile = () =>{
         :src="props.msg.content"
         lazy
         class="thumbnail"
+        :preview-teleported="true"
+        :initial-index="0"
+        fit="cover"
         :preview-src-list="[props.msg.content]"
-        @click="showImageViewer=true"
     ></el-image>
   </div>
   <div class="message-content" v-else-if="props.msg.msg_type===3" @click="downloadFile">
@@ -50,48 +64,114 @@ const downloadFile = () =>{
   </div>
   <div class="message-content" v-else-if="props.msg.msg_type===5" v-html="props.msg.content"></div>
   <div class="message-content" v-else-if="props.msg.msg_type===6">
-    <video :src="`http://${IP}:${PORT}/${props.msg.fileSaveName}`" controls></video>
+    <video v-if="videoUrl" :src="videoUrl" controls></video>
+    <div v-else class="uploading-tip">视频上传中...</div>
   </div>
   <div class="message-content" v-else v-html="props.msg.content"></div>
 </template>
 
 <style scoped>
 .message-username {
-  font-weight: bold;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+  font-size: 14px;
 }
+
 .message-time {
   font-size: 12px;
-  color: #888;
-  margin-left: 5px;
+  color: #999;
+  margin-left: 8px;
+  font-weight: normal;
 }
-.message {
-  margin-bottom: 10px;
+
+.message-content {
+  background-color: #fff;
+  padding: 12px 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  margin-bottom: 16px;
+  max-width: 80%;
+  word-break: break-word;
+  line-height: 1.5;
+  transition: all 0.3s ease;
 }
+
+.message-content:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.file {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.file:hover {
+  background: #ecf5ff;
+}
+
 .file-icon {
-  width: 40px;
-  height: 40px;
-  background-color: orange;
-  display: inline-block;
-  vertical-align: middle;
+  width: 48px;
+  height: 48px;
+  background-color: #ff9800;
+  border-radius: 6px;
+  position: relative;
 }
+
+.file-icon::after {
+  content: '';
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 24px;
+  height: 24px;
+  background-color: rgba(255,255,255,0.8);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z'/%3E%3C/svg%3E") no-repeat center;
+}
+
 .file-info {
-  display: inline-block;
-  vertical-align: middle;
-  margin-left: 10px;
+  margin-left: 16px;
+  flex: 1;
 }
 
 .file-name {
-  font-weight: bold;
-  font-size: 18px;
+  display: block;
+  font-weight: 500;
+  font-size: 16px;
+  color: #303133;
+  margin-bottom: 4px;
 }
 
 .file-size {
-  color: #666;
-  font-size: 14px;
+  color: #909399;
+  font-size: 13px;
 }
+
 .thumbnail {
-  width: 300px;
-  height: auto;
-  object-fit: cover;
+  max-width: 300px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+  transition: transform 0.3s ease;
+}
+
+.thumbnail:hover {
+  transform: scale(1.02);
+}
+
+video {
+  max-width: 100%;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+}
+
+.uploading-tip {
+  color: #909399;
+  text-align: center;
+  padding: 20px;
 }
 </style>
