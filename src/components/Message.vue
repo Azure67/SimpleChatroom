@@ -1,6 +1,21 @@
 <script setup>
-import {marked} from 'marked'
 import {ref, watch} from 'vue'
+import VMdPreview from '@kangc/v-md-editor/lib/preview'
+import '@kangc/v-md-editor/lib/style/preview.css'
+import githubTheme from '@kangc/v-md-editor/lib/theme/github.js'
+import '@kangc/v-md-editor/lib/theme/style/github.css'
+import katex from 'katex'
+import 'katex/dist/katex.min.css'
+import hljs from 'highlight.js'
+import markdownItKatex from 'markdown-it-katex'
+
+VMdPreview.use(githubTheme, {
+  Hljs: hljs,
+  extend(md) {
+    md.use(markdownItKatex)
+  }
+})
+
 //消息类型
 // 1 文字类型
 // 2 图片类型
@@ -16,6 +31,7 @@ const props = defineProps({
 const emit = defineEmits(['downloadFile'])
 const showImageViewer = ref(false)
 const videoUrl = ref('')
+const isDownloading = ref(false)
 
 watch(() => props.msg.progress, (newVal) => {
   if(props.msg.msg_type === 6 && newVal === 100) {
@@ -27,13 +43,17 @@ if(props.msg.msg_type === 6 && (!props.msg.progress || props.msg.progress === 10
   videoUrl.value = `http://${IP}:${PORT}/${props.msg.fileSaveName}`
 }
 
-// MarkDown转Html未完成，暂时搁置
-const MarkDownToHTML = (content)=>{
-  console.log(content)
-  return marked(content)
-}
 const downloadFile = () =>{
-  emit('downloadFile',props.msg.fileSaveName,props.msg.fileShowName)
+  if(isDownloading.value) {
+    return
+  }
+  isDownloading.value = true
+  
+  emit('downloadFile', props.msg.fileSaveName, props.msg.fileShowName)
+
+  setTimeout(() => {
+    isDownloading.value = false 
+  }, 10000)
 }
 </script>
 
@@ -54,20 +74,23 @@ const downloadFile = () =>{
     ></el-image>
   </div>
   <div class="message-content" v-else-if="props.msg.msg_type===3" @click="downloadFile">
-    <div class="file">
+    <div class="file" :class="{'downloading': isDownloading}">
       <div class="file-icon"></div>
       <div class="file-info">
         <span class="file-name">{{props.msg.fileShowName}}</span>
         <span class="file-size">{{ `${props.msg.fileSize}B` }}</span>
+        <span v-if="isDownloading" class="downloading-text">下载中...</span>
       </div>
     </div>
   </div>
-  <div class="message-content" v-else-if="props.msg.msg_type===5" v-html="props.msg.content"></div>
+  <div class="message-content markdown-content" v-else-if="props.msg.msg_type===5">
+    <v-md-preview :text="props.msg.content"></v-md-preview>
+  </div>
   <div class="message-content" v-else-if="props.msg.msg_type===6">
     <video v-if="videoUrl" :src="videoUrl" controls></video>
     <div v-else class="uploading-tip">视频上传中...</div>
   </div>
-  <div class="message-content" v-else v-html="props.msg.content"></div>
+  <div class="message-content" v-else>{{ props.msg.content }}</div>
 </template>
 
 <style scoped>
@@ -101,6 +124,20 @@ const downloadFile = () =>{
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
+.markdown-content :deep(.v-md-editor) {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.markdown-content :deep(.v-md-editor__preview-wrapper) {
+  padding: 0;
+}
+
+.markdown-content :deep(.katex) {
+  font-size: 1.1em;
+}
+
 .file {
   display: flex;
   align-items: center;
@@ -113,6 +150,17 @@ const downloadFile = () =>{
 
 .file:hover {
   background: #ecf5ff;
+}
+
+.file.downloading {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.downloading-text {
+  color: #409EFF;
+  font-size: 13px;
+  margin-left: 8px;
 }
 
 .file-icon {

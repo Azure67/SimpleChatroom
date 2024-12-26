@@ -100,6 +100,7 @@ const exitChat = () => {
   userStore.setMsgList([])
   Socket.close();
   router.push('/');
+  ElMessage.success("退出登录成功")
 };
 
 const sendMessage = () => {
@@ -331,9 +332,6 @@ Socket.on('undefineClient',()=>{
   router.push('/');
 })
 
-Socket.on('disconnect', () => {
-  ElMessage.warning('连接已断开,正在重连...')
-})
 
 Socket.on('reconnect', () => {
   ElMessage.success('重连成功')
@@ -423,14 +421,18 @@ onUnmounted(() => {
 
     <el-dialog v-model="showFileDialog" class="file-dialog" width="60%">
       <div class="dialog-buttons">
-        <el-button @click="showPictureDialogInFileDialog=true" class="dialog-btn">
-          <el-icon><Picture /></el-icon>
-          <span>发送图片</span>
-        </el-button>
-        <el-button @click="showFileDialogInFIleDialog=true" class="dialog-btn">
-          <el-icon><DocumentAdd /></el-icon>
-          <span>发送文件/视频</span>
-        </el-button>
+        <div class="dialog-btn-group">
+          <el-button class="dialog-btn" @click="showPictureDialogInFileDialog=true">
+            <el-icon class="dialog-icon"><Picture /></el-icon>
+          </el-button>
+          <span class="dialog-text">发送图片</span>
+        </div>
+        <div class="dialog-btn-group">
+          <el-button class="dialog-btn" @click="showFileDialogInFIleDialog=true">
+            <el-icon class="dialog-icon"><DocumentAdd /></el-icon>
+          </el-button>
+          <span class="dialog-text">发送文件/视频</span>
+        </div>
       </div>
 
       <el-dialog v-model="showPictureDialogInFileDialog" append-to-body width="70%" class="upload-dialog">
@@ -468,7 +470,7 @@ onUnmounted(() => {
           <el-icon class="upload-icon"><upload-filled /></el-icon>
           <div class="upload-text">
             <p>拖拽文件到此处或点击上传</p>
-            <p class="upload-hint">建议文件大小不超过1GB</p>
+            <p class="upload-hint">建议文件大小不超过5GB</p>
           </div>
         </el-upload>
         <div class="dialog-footer">
@@ -572,19 +574,38 @@ onUnmounted(() => {
 .file-dialog .dialog-buttons {
   display: flex;
   justify-content: center;
-  gap: 2rem;
+  gap: 4rem;
   margin: 2rem 0;
 }
 
-.dialog-btn {
+.dialog-btn-group {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1rem;
-  padding: 2rem;
-  width: 200px;
-  height: 200px;
-  font-size: 1.2rem;
+}
+
+.dialog-btn {
+  width: 180px;
+  height: 180px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.dialog-btn:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.dialog-icon {
+  font-size: 4rem;
+  color: #409eff;
+}
+
+.dialog-text {
+  font-size: 1.4rem;
+  color: #606266;
+  margin-top: 1rem;
 }
 
 .upload-dialog {
@@ -604,7 +625,6 @@ onUnmounted(() => {
 
 .upload-icon {
   font-size: 3rem;
-  color: #409eff;
   margin-bottom: 1rem;
 }
 

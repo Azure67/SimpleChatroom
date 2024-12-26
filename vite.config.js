@@ -20,9 +20,15 @@ export default defineConfig({
     }),
   ],
   base:"./",
+  server: {
+    host: true,
+    port: 5173,
+    strictPort: true,
+    cors: true
+  },
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
+      '@': '/src'
     },
   },
 })
