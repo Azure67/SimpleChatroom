@@ -340,7 +340,18 @@ Socket.on('reconnect', () => {
 Socket.on('reconnect_failed', () => {
   ElMessage.error('重连失败,请刷新页面')
 })
-
+Socket.on("checkUserInDatabase",(data)=>{
+  userStore.setlogin(false);
+  userStore.setname('');
+  userStore.setMsgList([])
+  Socket.close();
+  router.push('/');
+  if (data.exists===0){
+    ElMessage.error("非法手段进入")
+  }else {
+    ElMessage.error("数据库错误，请联系管理员")
+  }
+})
 const scrollToBottom = () => {
   if (messageContainer.value) {
     nextTick(() => {
@@ -352,6 +363,7 @@ watch(messages,(nv,ov)=>{
   userStore.setMsgList(nv)
 },{deep:true})
 onMounted(() => {
+  Socket.emit("checkUserInDatabase",{username: userStore.username})
   Socket.emit("newUserJoin", {
     username: userStore.username
   });

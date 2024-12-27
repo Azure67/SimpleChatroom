@@ -61,7 +61,8 @@ const downloadFile = () =>{
   <div class="message-username" v-if="props.msg.username">
     {{ props.msg.username }} <span class="message-time">{{ props.msg.time }}</span>
   </div>
-  <div class="message-content" v-if="props.msg.msg_type===1">{{ props.msg.content }}</div>
+  <div class="message-content" v-if="props.msg.is_HTML" v-html="props.msg.content"></div>
+  <div class="message-content" v-else-if="props.msg.msg_type===1">{{ props.msg.content }}</div>
   <div class="message-content" v-else-if="props.msg.msg_type===2">
     <el-image
         :src="props.msg.content"
@@ -90,7 +91,7 @@ const downloadFile = () =>{
     <video v-if="videoUrl" :src="videoUrl" controls></video>
     <div v-else class="uploading-tip">视频上传中...</div>
   </div>
-  <div class="message-content" v-else>{{ props.msg.content }}</div>
+  <div class="message-content" v-else >{{ props.msg.content }}</div>
 </template>
 
 <style scoped>
