@@ -38,7 +38,45 @@ const showFileDialog=ref(false)
 const showPictureDialogInFileDialog=ref(false)
 const showFileDialogInFIleDialog=ref(false)
 
-const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
+const CHUNK_SIZE = 1024 * 1024;
+
+const handlePaste = async (e) => {
+  const items = e.clipboardData.items;
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item.type.indexOf('image') !== -1) {
+      e.preventDefault();
+      const blob = item.getAsFile();
+      const file = new File([blob], `clipboard_${Date.now()}.png`, { type: 'image/png' });
+      if (showPictureDialogInFileDialog.value) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          PictureList.value.push({
+            raw: file,
+            name: file.name,
+            uid: Date.now(),
+            url: e.target.result
+          });
+        };
+        reader.readAsDataURL(file);
+      } else {
+        showFileDialog.value = true;
+        showPictureDialogInFileDialog.value = true;
+        await nextTick();
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          PictureList.value.push({
+            raw: file,
+            name: file.name,
+            uid: Date.now(),
+            url: e.target.result
+          });
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  }
+};
 
 const getMention_options=()=>{
   userList.value.forEach((value)=>{
@@ -128,19 +166,39 @@ const sendMessage = () => {
 const fileHandleChange=(file, fileList)=>{
   if (file.raw.type.startsWith("image")) {
     ElMessage.error("不能上传图片")
+    FileList.value = fileList.filter(f => f.uid !== file.uid)
+    return
   }
   FileList.value=fileList
+}
+const fileHandleRemove=(file)=>{
+  FileList.value = FileList.value.filter(f => f.uid !== file.uid)
 }
 const picHandleChange=(file,fileList)=>{
   console.log(file)
   console.log(fileList)
   if (file.raw.type.startsWith("image")){
     ElMessage.success("上传成功")
-    PictureList.value=fileList
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const existingFile = PictureList.value.find(f => f.uid === file.uid);
+      if (existingFile) {
+        existingFile.url = e.target.result;
+      } else {
+        PictureList.value.push({
+          ...file,
+          url: e.target.result
+        });
+      }
+    };
+    reader.readAsDataURL(file.raw);
   }else {
     ElMessage.error("只能上传图片类型")
-    PicUpload.value.handleRemove(file)
+    PictureList.value = fileList.filter(f => f.uid !== file.uid)
   }
+}
+const picHandleRemove=(file)=>{
+  PictureList.value = PictureList.value.filter(f => f.uid !== file.uid)
 }
 const submitFile=()=>{
   console.log(FileList.value)
@@ -331,7 +389,13 @@ Socket.on('undefineClient',()=>{
   userStore.setMsgList([]);
   router.push('/');
 })
-
+Socket.on('onlineUserNotExists',()=>{
+  ElMessage.error("非法进入");
+  userStore.setlogin(false);
+  userStore.setname('');
+  userStore.setMsgList([]);
+  router.push('/');
+})
 
 Socket.on('reconnect', () => {
   ElMessage.success('重连成功')
@@ -369,9 +433,11 @@ onMounted(() => {
   });
   getUserCountData()
   scrollToBottom();
+  window.addEventListener('paste', handlePaste);
 });
 onUnmounted(() => {
   Socket.close();
+  window.removeEventListener('paste', handlePaste);
 });
 </script>
 <template>
@@ -455,6 +521,8 @@ onUnmounted(() => {
           :action="`http://${IP}:${PORT}/upload`"
           :auto-upload="false"
           :on-change="picHandleChange"
+          :on-remove="picHandleRemove"
+          list-type="picture"
           :file-list="PictureList"
           multiple
         >
@@ -475,6 +543,7 @@ onUnmounted(() => {
           drag
           :action="`http://${IP}:${PORT}/upload`"
           :on-change="fileHandleChange"
+          :on-remove="fileHandleRemove"
           :auto-upload="false"
           :file-list="FileList"
           multiple
