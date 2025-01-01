@@ -5,6 +5,7 @@ import axios from "axios";
 import {useRouter} from "vue-router";
 
 const IP = "192.168.149.56"
+const PORT = "3000"
 const router = useRouter()
 const userStore = useUserStore()
 const is_reg=ref(true)
@@ -52,7 +53,7 @@ const user_register=async ()=>{
   await regformRef.value.validate()
   const username = reguserform.value.username.trim();
   const password = reguserform.value.password.trim();
-  await axios.post(`http://${IP}:3000/checkUserExists`,{
+  await axios.post(`http://${IP}:${PORT}/checkUserExists`,{
     'username':username
   }).then(res=>{
     if(res.data.msg===0){
@@ -72,7 +73,7 @@ const user_register=async ()=>{
   })
 }
 const create_user=async (username,password)=>{
-  await axios.post(`http://${IP}:3000/createUser`,{username:username,password:password}).then(res=>{
+  await axios.post(`http://${IP}:${PORT}/createUser`,{username:username,password:password}).then(res=>{
     if (res.data.msg===0) {
       ElMessage({
         message: '创建用户成功',
@@ -93,7 +94,7 @@ const user_login=async ()=>{
   await logformRef.value.validate()
   const username = loguserform.value.username.trim()
   const password = loguserform.value.password.trim()
-  await axios.post(`http://${IP}:3000/userLogin`,{
+  await axios.post(`http://${IP}:${PORT}/userLogin`,{
     'username':username,
     'password':password
   }).then(res =>{

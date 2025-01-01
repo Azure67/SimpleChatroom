@@ -15,10 +15,8 @@ declare module 'vue' {
     ElFormItem: typeof import('element-plus/es')['ElFormItem']
     ElIcon: typeof import('element-plus/es')['ElIcon']
     ElImage: typeof import('element-plus/es')['ElImage']
-    ElImageViewer: typeof import('element-plus/es')['ElImageViewer']
     ElInput: typeof import('element-plus/es')['ElInput']
     ElMention: typeof import('element-plus/es')['ElMention']
-    ElPopover: typeof import('element-plus/es')['ElPopover']
     ElProgress: typeof import('element-plus/es')['ElProgress']
     ElStatistic: typeof import('element-plus/es')['ElStatistic']
     ElSwitch: typeof import('element-plus/es')['ElSwitch']
@@ -29,6 +27,5 @@ declare module 'vue' {
     Message: typeof import('./src/components/Message.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
-    Test: typeof import('./src/components/test.vue')['default']
   }
 }
