@@ -106,3 +106,6 @@ Update the IP address (const IP="192.168.149.56") in the following files:
 ## License | 许可证
 
 [MIT License](LICENSE)
+
+2. Update the environment variables in `.env`:
+- `SPARK_API_KEY`: Your Spark AI API key
