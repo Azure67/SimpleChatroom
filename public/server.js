@@ -9,6 +9,9 @@ import path from 'path';
 import {writeFile,readFile,existsSync,appendFile} from 'fs'
 import timeout from 'connect-timeout'
 import dotenv from 'dotenv'
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 dotenv.config()
 
@@ -47,6 +50,122 @@ const formatTime = (date) => {
     const seconds = date.getSeconds().toString().padStart(2, '0');
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
+
+let proxyProcess = null;
+let proxyInfo = null;
+let proxyTimer = null;
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const launchProxy = async () => {
+    try {
+        if (proxyInfo) {
+            console.log('使用现有代理:', proxyInfo);
+            return proxyInfo;
+        }
+        
+        const proxyPath = path.join(__dirname, '代理.py');
+        if (!existsSync(proxyPath)) {
+            throw new Error(`代理脚本不存在: ${proxyPath}`);
+        }
+
+        console.log('启动代理脚本:', proxyPath);
+        const randomPort = Math.floor(Math.random() * (65535 - 1024) + 1024);
+        
+        return new Promise((resolve, reject) => {
+            try {
+                const pythonVersion = spawn('python', ['--version']);
+                pythonVersion.on('error', (err) => {
+                    console.error('Python未安装或不可用:', err);
+                    reject(new Error('Python未安装或不可用'));
+                });
+
+                console.log('正在启动代理进程...');
+                proxyProcess = spawn('python', [proxyPath], {
+                    stdio: ['pipe', 'pipe', 'pipe']
+                });
+                
+                let errorOutput = '';
+                let startupTimeout = setTimeout(() => {
+                    console.error('代理启动超时');
+                    reject(new Error('代理启动超时'));
+                    if (proxyProcess) {
+                        proxyProcess.kill();
+                    }
+                }, 10000);
+                
+                proxyProcess.stdout.on('data', (data) => {
+                    const output = data.toString().trim();
+                    console.log(`代理输出: ${output}`);
+                    
+                    if (output.startsWith('PROXY_STARTED:')) {
+                        clearTimeout(startupTimeout);
+                        const [ip, port] = output.split(':').slice(1);
+                        proxyInfo = { ip, port: parseInt(port) };
+                        console.log('代理启动成功:', proxyInfo);
+                        
+                        proxyTimer = setTimeout(() => {
+                            if(proxyProcess) {
+                                console.log('代理超时关闭');
+                                proxyProcess.kill();
+                                proxyProcess = null;
+                                proxyInfo = null;
+                            }
+                        }, 12 * 60 * 60 * 1000);
+                        
+                        resolve(proxyInfo);
+                    } else if (output.startsWith('PROXY_ERROR:') || output.startsWith('STARTUP_ERROR:')) {
+                        clearTimeout(startupTimeout);
+                        const errorMsg = output.split(':')[1];
+                        console.error('代理启动失败:', errorMsg);
+                        reject(new Error(errorMsg));
+                    }
+                });
+
+                proxyProcess.stderr.on('data', (data) => {
+                    errorOutput += data;
+                    console.error(`代理错误输出: ${data}`);
+                });
+
+                proxyProcess.on('error', (err) => {
+                    clearTimeout(startupTimeout);
+                    console.error('代理进程启动错误:', err);
+                    reject(new Error(`代理启动失败: ${err.message}`));
+                });
+
+                proxyProcess.on('close', (code) => {
+                    clearTimeout(startupTimeout);
+                    console.log(`代理进程关闭，退出码: ${code}`);
+                    if (code !== 0 && code !== null) {
+                        console.error('代理异常退出');
+                        console.error('错误输出:', errorOutput);
+                        reject(new Error(`代理异常退出，退出码: ${code}`));
+                    }
+                    proxyProcess = null;
+                    proxyInfo = null;
+                    if(proxyTimer) {
+                        clearTimeout(proxyTimer);
+                        proxyTimer = null;
+                    }
+                });
+
+                console.log('向代理发送配置...');
+                proxyProcess.stdin.write('1\n');
+                proxyProcess.stdin.write(`${randomPort}\n`);
+                console.log('配置已发送');
+
+            } catch (err) {
+                console.error('启动代理时发生错误:', err);
+                reject(err);
+            }
+        });
+    } catch (err) {
+        console.error('launchProxy 函数错误:', err);
+        throw err;
+    }
+}
+
 app.use(cors())
 app.use(express.json())
 server.listen(port, () => {
@@ -73,29 +192,76 @@ io.of('/groupChat').on('connection',(socket)=>{
             }
         })
     })
-    socket.on('sendMsg',async (data)=>{
-        console.log(data)
-        socket.broadcast.emit('getMsg',data)
-        if (data.msg_type===4){
-            const model_type =data.content.split(' ')[0]
-            console.log(model_type)
-            console.log(data.content.slice(model_type.length+1))
-            const response = await axios.post(`http://${IP}:3000/getAiMsg`,{
-                username:data.username,
-                model_type:model_type,
-                Msg:data.content.slice(model_type.length+1)
-            })
-            const aiMsg=response.data.message
-            io.of('/groupChat').emit('getMsg', {
-                id:Date.now(),
-                username:model_type.slice(1),
-                content:aiMsg,
-                time:formatTime(new Date()),
-                is_HTML:false,
-                msg_type:5
-            });
+    socket.on('sendMsg', async (data) => {
+        try {
+            console.log('收到消息:', data);
+            socket.broadcast.emit('getMsg', data);
+            
+            if (data.msg_type === 4) {
+                const model_type = data.content.split(' ')[0];
+                const message = data.content.slice(model_type.length + 1).trim();
+                
+                console.log('机器人类型:', model_type);
+                console.log('发送内容:', message);
+                
+                if (!message) {
+                    io.of('/groupChat').emit('getMsg', {
+                        id: Date.now(),
+                        username: model_type.slice(1),
+                        content: '请输入要发送的内容',
+                        time: formatTime(new Date()),
+                        is_HTML: false,
+                        msg_type: 5
+                    });
+                    return;
+                }
+
+                try {
+                    const response = await axios.post(`http://${IP}:${port}/getRobotMsg`, {
+                        username: data.username,
+                        model_type: model_type,
+                        Msg: message
+                    }, {
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        timeout: 30000
+                    });
+                    
+                    if (response.data && response.data.code === "0") {
+                        io.of('/groupChat').emit('getMsg', {
+                            id: Date.now(),
+                            username: model_type.slice(1),
+                            content: response.data.message,
+                            time: formatTime(new Date()),
+                            is_HTML: false,
+                            msg_type: 5
+                        });
+                    } else {
+                        throw new Error(response.data.message || '机器人响应异常');
+                    }
+                } catch (err) {
+                    console.error('机器人消息处理错误:', err);
+                    console.error('错误详情:', {
+                        message: err.message,
+                        response: err.response?.data,
+                        status: err.response?.status
+                    });
+                    
+                    io.of('/groupChat').emit('getMsg', {
+                        id: Date.now(),
+                        username: model_type.slice(1),
+                        content: `消息处理出错: ${err.response?.data?.message || err.message || '未知错误'}`,
+                        time: formatTime(new Date()),
+                        is_HTML: false,
+                        msg_type: 5
+                    });
+                }
+            }
+        } catch (err) {
+            console.error('sendMsg 事件处理错误:', err);
         }
-    })
+    });
 
     socket.on('uploadChunk', (data, callback) => {
         const {fileMsg, chunk, chunkIndex, totalChunks} = data;
@@ -307,7 +473,7 @@ app.post('/createUser', async (req, res) => {
         if (!username || !password) {
             return res.status(400).send('Username and password are required');
         }
-        const qdata = await usequery(`INSERT into user(name,password) VALUES('${username}','${password}')`)
+        const qdata = await usequery(`INSERT into user(name,password,permission) VALUES('${username}','${password}','${0}')`)
         if (qdata.affectedRows > 0){
             res.status(200).send(JSON.stringify({
                 code:200,
@@ -360,32 +526,139 @@ app.post('/userLogin',async (req,res)=>{
         }))
     }
 })
-// 与ai通信接口
-// /getAiMsg
-// 返回 code 成功时0
-//  message ai说的话
-// 传入
-// 用户名 username
-// 大模型 model_type   1 星火大模型   2.通义千问   3 kimi
-// 发送的信息 Msg
-app.post('/getAiMsg',async (req,res)=>{
+// 更新用户权限的接口
+// /updateUserPermission
+// 传入用户名和权限
+// username permission
+// 权限 0 普通用户 1 管理员
+// 返回 0 成功 1 失败
+app.post('/updateUserPermission',async (req,res)=>{
     const username = req.body.username
-    const model_type = req.body.model_type || "1"
-    const message = req.body.Msg
-    let aiMsg = ""
-    if (!username || !message) {
-        return res.status(400).send('Username or message are required');
+    const permission = req.body.permission
+    if (!username || !permission) {
+        return res.status(400).send('Username and permission are required');
     }
-    if (model_type==="@星火大模型"){
-        aiMsg = await getSparkaiMsg(username,message)
+    const qdata = await usequery(`UPDATE user SET permission = '${permission}' WHERE name = '${username}'`)
+    if (qdata.affectedRows > 0){
+        return res.status(200).send(JSON.stringify({
+            code:200,
+            msg:0
+        }))
     }else {
-        aiMsg="其他ai暂未接入"
+        return res.status(200).send(JSON.stringify({
+            code:200,
+            msg:1
+        }))
     }
-    return res.status(200).send(JSON.stringify({
-        code:"0",
-        message:aiMsg
+})
+// 获取用户权限的接口
+// /getUserPermission
+// 传入用户名
+// username
+// 返回 0 普通用户 1 管理员
+app.post('/getUserPermission',async (req,res)=>{
+    const username = req.body.username
+    if (!username) {
+        return res.status(400).send('Username is required');
+    }
+    const qdata = await usequery(`SELECT permission FROM user WHERE name = '${username}'`)
+    res.status(200).send(JSON.stringify({
+        code:200,
+        msg:qdata[0].permission
     }))
 })
+// 与机器人通信接口
+// /getRobotMsg
+// 返回 code 成功时0
+//  message 机器人说的话
+// 传入
+// 用户名 username
+// 机器人类型 model_type   星火大模型   机器人
+// 发送的信息 Msg
+app.post('/getRobotMsg', async (req, res) => {
+    try {
+        const { username, model_type, Msg } = req.body;
+        
+        // 输入验证
+        if (!username || !Msg) {
+            return res.status(400).json({
+                code: "1",
+                message: '缺少必要参数：username 或 Msg'
+            });
+        }
+
+        if (!model_type) {
+            return res.status(400).json({
+                code: "1",
+                message: '缺少机器人类型'
+            });
+        }
+
+        let robotMsg = "";
+        
+        if (model_type === "@星火大模型") {
+            try {
+                robotMsg = await getSparkaiMsg(username, Msg);
+                if (!robotMsg) {
+                    throw new Error('星火API返回空响应');
+                }
+            } catch (err) {
+                console.error('星火API调用错误:', err);
+                return res.status(500).json({
+                    code: "1",
+                    message: `星火API调用失败: ${err.message}`
+                });
+            }
+        } else if (model_type === "@机器人") {
+            try {
+                if(Msg=="开启代理"){
+                const proxyInfo = await launchProxy();
+                if (proxyInfo && proxyInfo.ip && proxyInfo.port) {
+                    return res.status(200).json({
+                        code: "0",
+                        message: `代理开启成功，地址为 ${proxyInfo.ip}:${proxyInfo.port}`
+                    });
+                } else {
+                    throw new Error('代理信息无效');
+                }}else if(Msg=="关闭代理"){
+                    if (proxyProcess) {
+                        proxyProcess.kill();
+                        proxyProcess = null;
+                        proxyInfo = null;
+                        proxyTimer = null;
+                    }
+                    return res.status(200).json({
+                        code: "0",
+                        message: "代理已关闭"
+                    });
+                }
+            } catch (err) {
+                console.error('代理启动错误:', err);
+                return res.status(500).json({
+                    code: "1",
+                    message: `代理启动失败: ${err.message}`
+                });
+            }
+        } else {
+            return res.status(200).json({
+                code: "0",
+                message: "其他机器人暂未接入"
+            });
+        }
+        
+        return res.status(200).json({
+            code: "0",
+            message: robotMsg
+        });
+        
+    } catch (err) {
+        console.error('getRobotMsg 路由错误:', err);
+        return res.status(500).json({
+            code: "1",
+            message: `服务器错误: ${err.message}`
+        });
+    }
+});
 //上传文件接口(废弃，改用socket传输)
 app.post('/upload', upload.single('file'), (req, res) => {
     if (!req.file) {

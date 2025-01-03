@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import Login from '@/components/Login.vue';
 import ChatRoom from '@/components/ChatRoom.vue';
 import {useUserStore} from "@/store/index.js";
+import SuperUserLogin from '@/components/SuperUserLogin.vue';
 
 const routes = [
     {
@@ -26,6 +27,11 @@ const routes = [
             }
         }
     },
+    {
+        path:'/superuserLogin',
+        name:'SuperUserLogin',
+        component:SuperUserLogin
+    }
 ];
 
 const router = createRouter({
