@@ -208,7 +208,7 @@ io.of('/groupChat').on('connection',(socket)=>{
                     io.of('/groupChat').emit('getMsg', {
                         id: Date.now(),
                         username: model_type.slice(1),
-                        content: '请输入要发送的内容',
+                        content: '请输入想提问的内容',
                         time: formatTime(new Date()),
                         is_HTML: false,
                         msg_type: 5
@@ -232,7 +232,17 @@ io.of('/groupChat').on('connection',(socket)=>{
                         io.of('/groupChat').emit('getMsg', {
                             id: Date.now(),
                             username: model_type.slice(1),
-                            content: response.data.message,
+                            content: response.data.message.aiMsg,
+                            time: formatTime(new Date()),
+                            is_HTML: false,
+                            msg_type: 5
+                        });
+                        io.of('/groupChat').emit('getMsg', {
+                            id: Date.now(),
+                            username: model_type.slice(1),
+                            content: `@${data.username}\n 本次用户信息消耗token数：${response.data.message.token.prompt_tokens}\n
+                                    本次机器人信息消耗token数：${response.data.message.token.completion_tokens}\n
+                                    本次消耗总token数：${response.data.message.token.total_tokens}`,
                             time: formatTime(new Date()),
                             is_HTML: false,
                             msg_type: 5
@@ -320,6 +330,7 @@ io.of('/groupChat').on('connection',(socket)=>{
         socket.broadcast.emit('levelChatroom',{
             name:socket.username
         })
+        sparkAiHistories[socket.username]=[]
         console.log(getAllOnlineGroupMembers());
         io.of('/groupChat').emit('allUser', { userList: getAllOnlineGroupMembers() });
     })
@@ -350,83 +361,110 @@ const getSparkAiHeaders = (API_PASSWORD)=>{
         'Content-Type': 'application/json',
     };
 }
-const getconn=()=>{
-    return mysql.createConnection({
-        host: 'localhost',
-        user: 'root',
-        password: '123456',
-        database: 'chatroom'
-    });
-}
-const usequery=async (query)=>{
+const pool = mysql.createPool({
+    host: 'localhost',
+    user: 'root',
+    password: '123456',
+    database: 'chatroom',
+    connectionLimit: 10,
+    connectTimeout: 10000,
+    acquireTimeout: 10000,
+    timeout: 10000,
+});
+
+const usequery = async (query) => {
     return new Promise((resolve, reject) => {
-        const conn = getconn();
-        conn.query(query,(error, results, fields) => {
-            if (error) {
-                console.error('Error executing query:', error);
-                reject(error);
-            } else {
-                resolve(results);
+        pool.getConnection((err, connection) => {
+            if (err) {
+                console.error('获取连接错误:', err);
+                reject(err);
+                return;
             }
+
+            connection.query(query, (error, results, fields) => {
+                // 释放连接回连接池
+                connection.release();
+
+                if (error) {
+                    console.error('查询执行错误:', error);
+                    reject(error);
+                } else {
+                    resolve(results);
+                }
+            });
         });
     });
 }
-const getSparkaiMsg = async (username,message)=>{
-    if (message.startsWith("设定角色")){
-        sparkAiHistories[username]=[]
-        sparkAiHistories[username].push({
-            role: 'system', content: `${message}`
-        })
-        return "设定角色成功，并以清除历史记录"
-    }
-    if (username in sparkAiHistories){
-        sparkAiHistories[username].push({
-            role:"user",
-            content:message
-        })
-        console.log(sparkAiHistories[username])
-    }else {
-        sparkAiHistories[username]=[]
-        sparkAiHistories[username].push({
-            role: 'system', content: '你是猫娘,回答问题时要经常加上喵~的字样，同时语气也是猫娘的语气，同时如果需要，叫用户主人'
-        },)
-        sparkAiHistories[username].push({
-            role:"user",
-            content:message
-        })
-    }
-    const headers = getSparkAiHeaders(process.env.SPARK_API_KEY)
-    // await axios.post("https://spark-api-open.xf-yun.com/v1/chat/completions",{
-    //     model: 'generalv3.5',
-    //     user: username,
-    //     messages:sparkAiHistories[username]
-    // },{headers}).then((response) => {
-    //     console.log('Response:', response.data.choices[0].message.content);
-    //     sparkAiHistories[username].push({
-    //         role:"assistant",
-    //         content:response.data.choices[0].message.content
-    //     })
-    //     return response.data.choices[0].message.content
-    // })
-    //     .catch(error => {
-    //         console.error('Error:', error.response ? error.response.data : error.message);
-    //         return "error"
-    //     });
+const getSparkaiMsg = async (username, message) => {
     try {
-        const response = await axios.post("https://spark-api-open.xf-yun.com/v1/chat/completions",{
-            model: 'generalv3.5',
-            user: username,
-            messages:sparkAiHistories[username]
-        },{headers})
-        const aiMsg=response.data.choices[0].message.content
-        sparkAiHistories[username].push({
-            role:"assistant",
-            content:aiMsg
-        })
-        return aiMsg
-    }catch (err){
-        console.error('Error:', error.response ? error.response.data : error.message);
-        return "error";
+        if (message.startsWith("设定角色")){
+            sparkAiHistories[username]=[]
+            sparkAiHistories[username].push({
+                role: 'system', content: `${message}`
+            })
+            return "设定角色成功，并以清除历史记录"
+        }
+        if (username in sparkAiHistories){
+            sparkAiHistories[username].push({
+                role:"user",
+                content:message
+            })
+            console.log(sparkAiHistories[username])
+        }else {
+            sparkAiHistories[username]=[]
+            sparkAiHistories[username].push({
+                role: 'system', content: '你是猫娘,回答问题时要经常加上喵~的字样，同时语气也是猫娘的语气，同时如果需要，叫用户主人'
+            },)
+            sparkAiHistories[username].push({
+                role:"user",
+                content:message
+            })
+        }
+        const headers = getSparkAiHeaders(process.env.SPARK_API_KEY);
+        const maxRetries = 3;
+        let retryCount = 0;
+        
+        while (retryCount < maxRetries) {
+            try {
+                const response = await axios.post(
+                    "https://spark-api-open.xf-yun.com/v1/chat/completions",
+                    {
+                        model: 'generalv3.5',
+                        user: username,
+                        messages: sparkAiHistories[username]
+                    },
+                    {
+                        headers,
+                        timeout: 60000  // 增加超时时间到60秒
+                    }
+                );
+                
+                const aiMsg = response.data.choices[0].message.content;
+                sparkAiHistories[username].push({
+                    role: "assistant",
+                    content: aiMsg
+                });
+                
+                return {
+                    aiMsg: aiMsg,
+                    token: response.data.usage
+                };
+                
+            } catch (err) {
+                retryCount++;
+                console.error(`AI请求失败 (尝试 ${retryCount}/${maxRetries}):`, err.message);
+                
+                if (retryCount === maxRetries) {
+                    throw new Error(`多次请求失败: ${err.message}`);
+                }
+                
+                // 等待一段时间后重试
+                await new Promise(resolve => setTimeout(resolve, 2000 * retryCount));
+            }
+        }
+    } catch (err) {
+        console.error('Spark AI 调用错误:', err);
+        throw new Error(`AI服务暂时不可用: ${err.message}`);
     }
 }
 // 查看在线用户

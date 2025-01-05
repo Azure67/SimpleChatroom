@@ -139,7 +139,7 @@ const user_login=async ()=>{
                 </el-input>
               </el-form-item>
               <el-form-item prop="password">
-                <el-input style="width: 300px" placeholder="请输入密码" type="password" v-model="loguserform.password">
+                <el-input style="width: 300px" placeholder="请输入密码" type="password" v-model="loguserform.password" show-password>
                   <template #prefix>
                     <el-icon><Lock /></el-icon>
                   </template>
