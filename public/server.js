@@ -237,16 +237,20 @@ io.of('/groupChat').on('connection',(socket)=>{
                             is_HTML: false,
                             msg_type: 5
                         });
-                        io.of('/groupChat').emit('getMsg', {
-                            id: Date.now(),
-                            username: model_type.slice(1),
-                            content: `@${data.username}\n 本次用户信息消耗token数：${response.data.message.token.prompt_tokens}\n
-                                    本次机器人信息消耗token数：${response.data.message.token.completion_tokens}\n
-                                    本次消耗总token数：${response.data.message.token.total_tokens}`,
-                            time: formatTime(new Date()),
-                            is_HTML: false,
-                            msg_type: 5
-                        });
+                        if(model_type === "@星火大模型"){
+                            io.of('/groupChat').emit('getMsg', {
+                                id: Date.now(),
+                                username: model_type.slice(1),
+                                content:`### Token 消耗信息
+                                - 用户信息消耗 token 数: ${response.data.message.token.prompt_tokens}
+                                - 机器人信息消耗 token 数: ${response.data.message.token.completion_tokens}
+                                - 本次回复总消耗 token 数:${response.data.message.token.total_tokens}`,
+                                time: formatTime(new Date()),
+                                is_HTML: false,
+                                msg_type: 5
+                            });
+                        }
+
                     } else {
                         throw new Error(response.data.message || '机器人响应异常');
                     }
@@ -654,7 +658,7 @@ app.post('/getRobotMsg', async (req, res) => {
                 if (proxyInfo && proxyInfo.ip && proxyInfo.port) {
                     return res.status(200).json({
                         code: "0",
-                        message: `代理开启成功，地址为 ${proxyInfo.ip}:${proxyInfo.port}`
+                        message:{aiMsg:`代理开启成功，地址为 ${proxyInfo.ip}:${proxyInfo.port}`} 
                     });
                 } else {
                     throw new Error('代理信息无效');
@@ -667,20 +671,20 @@ app.post('/getRobotMsg', async (req, res) => {
                     }
                     return res.status(200).json({
                         code: "0",
-                        message: "代理已关闭"
+                        message:{aiMsg:"代理已关闭"}
                     });
                 }
             } catch (err) {
                 console.error('代理启动错误:', err);
                 return res.status(500).json({
                     code: "1",
-                    message: `代理启动失败: ${err.message}`
+                    message:{aiMsg:`代理启动失败: ${err.message}`}
                 });
             }
         } else {
             return res.status(200).json({
                 code: "0",
-                message: "其他机器人暂未接入"
+                message:{aiMsg:"其他机器人暂未接入"}
             });
         }
         
@@ -693,7 +697,7 @@ app.post('/getRobotMsg', async (req, res) => {
         console.error('getRobotMsg 路由错误:', err);
         return res.status(500).json({
             code: "1",
-            message: `服务器错误: ${err.message}`
+            message:{aiMsg:`服务器错误: ${err.message}`}
         });
     }
 });
