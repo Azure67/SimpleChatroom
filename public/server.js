@@ -13,8 +13,7 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
-dotenv.config()
-
+dotenv.config({path:path.resolve(path.dirname(fileURLToPath(import.meta.url)),"../.env")})
 const IP="192.168.149.56"
 const app = express()
 app.use(timeout('20m'))
@@ -441,7 +440,9 @@ const getSparkaiMsg = async (username, message) => {
                         headers,
                         timeout: 60000  // 增加超时时间到60秒
                     }
-                );
+                ).catch((err)=>{
+                    console.log(`SparkAPI请求错误: ${err.message}`)
+                });
                 
                 const aiMsg = response.data.choices[0].message.content;
                 sparkAiHistories[username].push({
