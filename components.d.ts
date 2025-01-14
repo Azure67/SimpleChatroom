@@ -28,5 +28,6 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SuperUserLogin: typeof import('./src/components/SuperUserLogin.vue')['default']
+    TokenBar: typeof import('./src/components/TokenBar.vue')['default']
   }
 }

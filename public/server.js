@@ -16,16 +16,17 @@ import { dirname } from 'path';
 dotenv.config({path:path.resolve(path.dirname(fileURLToPath(import.meta.url)),"../.env")})
 const IP="192.168.149.56"
 const app = express()
+const port = 3000
 app.use(timeout('20m'))
 const server = http.createServer(app);
-const port = 3000
 const io = new Server(server,{
     cors:true,
     maxHttpBufferSize:5 * 1024 * 1024 * 1024
 })
 app.use(express.static('E:\\simpleChatroomFile'))
 const sparkAiHistories={}
-
+const sparkAiHistoriesToken= {}
+const userMessageNumCount= {}
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, 'E:/simpleChatroomFile');
@@ -57,6 +58,7 @@ let proxyTimer = null;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// 代理
 const launchProxy = async () => {
     try {
         if (proxyInfo) {
@@ -185,6 +187,13 @@ io.of('/groupChat').on('connection',(socket)=>{
             socket.disconnect()
         }
         io.of('/groupChat').emit('allUser', { userList: userlist });
+        
+        // 新用户加入时，向所有用户发送最新的图表数据
+        io.of('/groupChat').emit('getEchartsData', {
+            sparkAiHistoriesToken,
+            userMessageNumCount
+        });
+        
         sockets.forEach((value)=>{
             if (!value.username){
                 value.emit('undefineClient')
@@ -195,14 +204,13 @@ io.of('/groupChat').on('connection',(socket)=>{
         try {
             console.log('收到消息:', data);
             socket.broadcast.emit('getMsg', data);
-            
+            data.username in userMessageNumCount ? userMessageNumCount[data.username]+=1:userMessageNumCount[data.username]=1
+            io.of('/groupChat').emit('getEchartsData',{sparkAiHistoriesToken,userMessageNumCount})
             if (data.msg_type === 4) {
                 const model_type = data.content.split(' ')[0];
                 const message = data.content.slice(model_type.length + 1).trim();
-                
                 console.log('机器人类型:', model_type);
                 console.log('发送内容:', message);
-                
                 if (!message) {
                     io.of('/groupChat').emit('getMsg', {
                         id: Date.now(),
@@ -337,6 +345,12 @@ io.of('/groupChat').on('connection',(socket)=>{
         console.log(getAllOnlineGroupMembers());
         io.of('/groupChat').emit('allUser', { userList: getAllOnlineGroupMembers() });
     })
+    socket.on('requestEchartsData', () => {
+        socket.emit('getEchartsData', {
+            sparkAiHistoriesToken,
+            userMessageNumCount
+        });
+    });
 })
 
 const getAllOnlineGroupMembers = () => {
@@ -422,7 +436,9 @@ const getSparkaiMsg = async (username, message) => {
                 role:"user",
                 content:message
             })
+            sparkAiHistoriesToken[username] = 0
         }
+
         const headers = getSparkAiHeaders(process.env.SPARK_API_KEY);
         const maxRetries = 3;
         let retryCount = 0;
@@ -449,7 +465,19 @@ const getSparkaiMsg = async (username, message) => {
                     role: "assistant",
                     content: aiMsg
                 });
-                
+
+                const totalTokens = parseInt(response.data.usage.total_tokens) || 0;
+                if (!sparkAiHistoriesToken[username]) {
+                    sparkAiHistoriesToken[username] = 0;
+                }
+                sparkAiHistoriesToken[username] += totalTokens;
+
+                console.log('Token 统计:', sparkAiHistoriesToken);
+                io.of('/groupChat').emit('getEchartsData', {
+                    sparkAiHistoriesToken,
+                    userMessageNumCount
+                });
+
                 return {
                     aiMsg: aiMsg,
                     token: response.data.usage
@@ -463,7 +491,6 @@ const getSparkaiMsg = async (username, message) => {
                     throw new Error(`多次请求失败: ${err.message}`);
                 }
                 
-                // 等待一段时间后重试
                 await new Promise(resolve => setTimeout(resolve, 2000 * retryCount));
             }
         }
@@ -654,7 +681,7 @@ app.post('/getRobotMsg', async (req, res) => {
             }
         } else if (model_type === "@机器人") {
             try {
-                if(Msg=="开启代理"){
+                if(Msg==="开启代理"){
                 const proxyInfo = await launchProxy();
                 if (proxyInfo && proxyInfo.ip && proxyInfo.port) {
                     return res.status(200).json({
@@ -663,7 +690,7 @@ app.post('/getRobotMsg', async (req, res) => {
                     });
                 } else {
                     throw new Error('代理信息无效');
-                }}else if(Msg=="关闭代理"){
+                }}else if(Msg==="关闭代理"){
                     if (proxyProcess) {
                         proxyProcess.kill();
                         proxyProcess = null;

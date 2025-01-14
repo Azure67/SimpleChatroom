@@ -1,9 +1,10 @@
 <script setup>
-import {ref} from "vue";
+import {ref, onUnmounted} from "vue";
 import {useUserStore} from "@/store/index.js";
 import axios from "axios";
 import {useRouter} from "vue-router";
 import {User,Lock} from "@element-plus/icons-vue";
+import Socket from "@/socket.js";
 
 const IP = "192.168.149.56"
 const PORT = "3000"
@@ -95,31 +96,59 @@ const user_login=async ()=>{
   await logformRef.value.validate()
   const username = loguserform.value.username.trim()
   const password = loguserform.value.password.trim()
-  await axios.post(`http://${IP}:${PORT}/userLogin`,{
-    'username':username,
-    'password':password
-  }).then(res =>{
-    if (res.data.msg===0){
+  try {
+    const res = await axios.post(`http://${IP}:${PORT}/userLogin`, {
+      'username': username,
+      'password': password
+    });
+    
+    if (res.data.msg === 0) {
       ElMessage({
         message: '登录成功',
         type: 'success',
-      })
-      userStore.setname(username)
-      userStore.setlogin(true)
-      router.push('/chat')
-    }else if(res.data.msg===2){
+      });
+      
+      // 保存用户名到 localStorage
+      localStorage.setItem('username', username);
+      userStore.setname(username);
+      userStore.setlogin(true);
+      
+      // 登录成功后连接 Socket
+      Socket.connect();
+      
+      // 等待 Socket 连接成功后再跳转
+      Socket.on('connect', () => {
+        router.push('/chat');
+      });
+      
+      // 添加连接错误处理
+      Socket.on('connect_error', (error) => {
+        ElMessage.error('连接服务器失败，请重试');
+        console.error('Socket connection error:', error);
+      });
+      
+    } else if (res.data.msg === 2) {
       ElMessage({
-        message:'该用户已登录',
-        type:'error'
-      })
+        message: '该用户已登录',
+        type: 'error'
+      });
     } else {
       ElMessage({
         message: '登录失败，账号或密码错误',
         type: 'error',
-      })
+      });
     }
-  })
+  } catch (error) {
+    console.error('Login error:', error);
+    ElMessage.error('登录请求失败，请重试');
+  }
 }
+
+// 在组件卸载时清理事件监听
+onUnmounted(() => {
+  Socket.off('connect');
+  Socket.off('connect_error');
+});
 </script>
 
 <template>

@@ -3,11 +3,11 @@ import {nextTick, onMounted, onUnmounted, ref, watch} from 'vue';
 import {User, Files, UploadFilled, Picture, DocumentAdd} from "@element-plus/icons-vue"
 import {useUserStore} from "@/store/index.js";
 import {useRouter} from "vue-router";
-import io from 'socket.io-client';
 import data from "emoji-mart-vue-fast/data/all.json";
 import "emoji-mart-vue-fast/css/emoji-mart.css";
 import {EmojiIndex, Picker} from "emoji-mart-vue-fast/src";
 import axios from "axios";
+import Socket from "@/socket.js";
 
 const user_button = ref()
 const FileUpload = ref()
@@ -25,11 +25,6 @@ const userStore = useUserStore();
 const messages = ref(userStore.msgList || []);
 const inputMessage = ref('');
 const messageContainer = ref(null);
-const Socket = io(`http://${IP}:${PORT}/groupChat`, {
-  reconnection: true,
-  reconnectionAttempts: 5,
-  reconnectionDelay: 1000
-});
 const userList=ref([])
 const showUserDrawer=ref(false)
 const userMsgShowList=ref([])
@@ -135,10 +130,12 @@ function sleep(time) {
 const exitChat = () => {
   userStore.setlogin(false);
   userStore.setname('');
-  userStore.setMsgList([])
-  Socket.close();
+  userStore.setMsgList([]);
+  localStorage.removeItem('username');
+  Socket.resetState();
+  Socket.disconnect();
   router.push('/');
-  ElMessage.success("退出登录成功")
+  ElMessage.success("退出登录成功");
 };
 
 const sendMessage = () => {
@@ -427,16 +424,35 @@ watch(messages,(nv,ov)=>{
   userStore.setMsgList(nv)
 },{deep:true})
 onMounted(() => {
-  Socket.emit("checkUserInDatabase",{username: userStore.username})
-  Socket.emit("newUserJoin", {
-    username: userStore.username
-  });
-  getUserCountData()
+  Socket.emit("checkUserInDatabase", {username: userStore.username});
+  
+
+  if (!localStorage.getItem('username')) {
+    Socket.emit("newUserJoin", {
+      username: userStore.username
+    });
+  }
+  
+  getUserCountData();
   scrollToBottom();
   window.addEventListener('paste', handlePaste);
 });
 onUnmounted(() => {
-  Socket.close();
+  // 移除所有相关的事件监听
+  Socket.off('userjoin');
+  Socket.off('levelChatroom');
+  Socket.off('getMsg');
+  Socket.off('allUser');
+  Socket.off('undefineClient');
+  Socket.off('onlineUserNotExists');
+  Socket.off('reconnect');
+  Socket.off('reconnect_failed');
+  Socket.off('checkUserInDatabase');
+  Socket.off('downloadFile');
+  
+  // 断开连接
+  Socket.disconnect();
+  
   window.removeEventListener('paste', handlePaste);
 });
 </script>
@@ -451,16 +467,30 @@ onUnmounted(() => {
       </el-button>
     </header>
 
-    <el-drawer v-model="showUserDrawer" direction="rtl" size="400px">
+    <el-drawer 
+      v-model="showUserDrawer" 
+      direction="rtl" 
+      size="500px" 
+      :destroy-on-close="false"
+      class="statistics-drawer"
+    >
       <div class="drawer-content">
         <div class="statistics-container">
           <el-statistic title="在线人数" :value="userList.length"></el-statistic>
           <el-statistic title="消息总数" :value="messages.length"></el-statistic>
         </div>
-        <el-table :data="userMsgShowList" :default-sort="{prop:'count',order:'descending'}" class="user-table">
+        <el-table 
+          :data="userMsgShowList" 
+          :default-sort="{prop:'count',order:'descending'}" 
+          class="user-table"
+          height="200"
+        >
           <el-table-column prop="name" label="用户名"></el-table-column>
           <el-table-column prop="count" label="发言次数" sortable></el-table-column>
         </el-table>
+        <div class="token-chart-container">
+          <TokenBar></TokenBar>
+        </div>
       </div>
     </el-drawer>
 
@@ -638,18 +668,36 @@ onUnmounted(() => {
   min-width: 80px;
 }
 
+.statistics-drawer :deep(.el-drawer__body) {
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+}
+
 .drawer-content {
-  padding: 1rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .statistics-container {
+  flex-shrink: 0;
   display: flex;
   justify-content: space-around;
-  margin-bottom: 2rem;
+  margin-bottom: 20px;
 }
 
 .user-table {
-  width: 100%;
+  flex-shrink: 0;
+  margin-bottom: 20px;
+}
+
+.token-chart-container {
+  flex: 1;
+  min-height: 0;
+  position: relative;
 }
 
 .file-dialog .dialog-buttons {
@@ -745,5 +793,12 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+.token-chart-container {
+  margin-top: 20px;
+  width: 100%;
+  height: auto;
+  position: relative;
 }
 </style>
