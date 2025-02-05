@@ -14,9 +14,9 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
 dotenv.config({path:path.resolve(path.dirname(fileURLToPath(import.meta.url)),"../.env")})
-const IP="192.168.149.56"
+const IP=process.env.IP
+const port = process.env.PORT
 const app = express()
-const port = 3000
 app.use(timeout('20m'))
 const server = http.createServer(app);
 const io = new Server(server,{

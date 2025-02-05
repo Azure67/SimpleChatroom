@@ -1,7 +1,7 @@
 import io from 'socket.io-client';
 
-const IP = "192.168.149.56";
-const PORT = "3000";
+const IP = import.meta.env.VITE_IP;
+const PORT = import.meta.env.VITE_PORT;
 
 let socket = null;
 let hasJoined = false;
@@ -20,8 +20,7 @@ export const initSocket = () => {
       username: localStorage.getItem('username')
     }
   });
-  
-  // 添加重连成功的处理
+
   socket.on('connect', () => {
     const username = localStorage.getItem('username');
     if (username && !hasJoined) {
@@ -29,8 +28,7 @@ export const initSocket = () => {
       hasJoined = true;
     }
   });
-  
-  // 断开连接时重置标记
+
   socket.on('disconnect', () => {
     hasJoined = false;
   });
@@ -48,7 +46,6 @@ export const getSocket = () => {
   return socket;
 };
 
-// 添加重置方法
 export const resetSocketState = () => {
   hasJoined = false;
 };

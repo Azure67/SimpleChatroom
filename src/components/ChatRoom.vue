@@ -16,8 +16,8 @@ const PictureList=ref([])
 const FileList=ref([])
 const emojiIndex = new EmojiIndex(data)
 const showEmojiDialog = ref(false)
-const IP = "192.168.149.56";
-const PORT="3000"
+const IP = import.meta.env.VITE_IP;
+const PORT=import.meta.env.PORT
 const is_HTML = ref(false);
 const aiUserList=ref(['机器人','星火大模型'])
 const router = useRouter();
@@ -438,7 +438,6 @@ onMounted(() => {
   window.addEventListener('paste', handlePaste);
 });
 onUnmounted(() => {
-  // 移除所有相关的事件监听
   Socket.off('userjoin');
   Socket.off('levelChatroom');
   Socket.off('getMsg');
@@ -449,8 +448,7 @@ onUnmounted(() => {
   Socket.off('reconnect_failed');
   Socket.off('checkUserInDatabase');
   Socket.off('downloadFile');
-  
-  // 断开连接
+
   Socket.disconnect();
   
   window.removeEventListener('paste', handlePaste);

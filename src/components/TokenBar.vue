@@ -218,7 +218,6 @@ const updateChart = () => {
   myChart.value.setOption(updateOption);
 }
 
-// 监听窗口大小变化
 const handleResize = () => {
   if (resizeTimer) clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
@@ -246,8 +245,7 @@ const refreshData = () => {
 
 onMounted(async () => {
   await initEcharts();
-  
-  // 监听容器大小变化
+
   resizeObserver = new ResizeObserver(() => {
     resizeChart();
   });

@@ -23,8 +23,8 @@ VMdPreview.use(githubTheme, {
 // 4 向ai提问
 // 5 ai发言
 // 6 视频类型
-const IP = "192.168.149.56";
-const PORT="3000"
+const IP =import.meta.env.VITE_IP
+const PORT=import.meta.env.VITE_PORT
 const props = defineProps({
   msg:Object,
 })
