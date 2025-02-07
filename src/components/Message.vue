@@ -1,5 +1,5 @@
 <script setup>
-import {ref, watch} from 'vue'
+import {ref, watch,onMounted} from 'vue'
 import VMdPreview from '@kangc/v-md-editor/lib/preview'
 import '@kangc/v-md-editor/lib/style/preview.css'
 import githubTheme from '@kangc/v-md-editor/lib/theme/github.js'
@@ -8,7 +8,9 @@ import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import hljs from 'highlight.js'
 import markdownItKatex from 'markdown-it-katex'
+import {useUserStore} from "@/store/index.js";
 
+const userStore = useUserStore()
 VMdPreview.use(githubTheme, {
   Hljs: hljs,
   extend(md) {
@@ -28,6 +30,7 @@ const PORT=import.meta.env.VITE_PORT
 const props = defineProps({
   msg:Object,
 })
+const avatar=ref('')
 const emit = defineEmits(['downloadFile'])
 const showImageViewer = ref(false)
 const videoUrl = ref('')
@@ -38,7 +41,6 @@ watch(() => props.msg.progress, (newVal) => {
     videoUrl.value = `http://${IP}:${PORT}/${props.msg.fileSaveName}`
   }
 })
-
 if(props.msg.msg_type === 6 && (!props.msg.progress || props.msg.progress === 100)) {
   videoUrl.value = `http://${IP}:${PORT}/${props.msg.fileSaveName}`
 }
@@ -55,11 +57,36 @@ const downloadFile = () =>{
     isDownloading.value = false 
   }, 10000)
 }
+onMounted(async () => {
+  if (props.msg.username) {
+    // 先使用缓存的头像
+    avatar.value = userStore.getAvatar(props.msg.username);
+    // 然后异步加载最新头像
+    await userStore.loadUserAvatar(props.msg.username);
+    // 更新显示
+    avatar.value = userStore.getAvatar(props.msg.username);
+  }
+});
+
+// 监听头像变化
+watch(() => userStore.getAvatar(props.msg.username), (newAvatar) => {
+  if (props.msg.username) {
+    avatar.value = newAvatar;
+  }
+});
 </script>
 
 <template>
-  <div class="message-username" v-if="props.msg.username">
-    {{ props.msg.username }} <span class="message-time">{{ props.msg.time }}</span>
+  <div class="message-header" v-if="props.msg.username">
+    <el-avatar 
+      :src="avatar" 
+      :size="40"
+      class="message-avatar"
+    />
+    <div class="message-info">
+      <span class="message-username">{{ props.msg.username }}</span>
+      <span class="message-time">{{ props.msg.time }}</span>
+    </div>
   </div>
   <div class="message-content" v-if="props.msg.is_HTML" v-html="props.msg.content"></div>
   <div class="message-content" v-else-if="props.msg.msg_type===1">{{ props.msg.content }}</div>
@@ -95,17 +122,40 @@ const downloadFile = () =>{
 </template>
 
 <style scoped>
+.message-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 12px;
+}
+
+.message-avatar {
+  flex-shrink: 0;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: transform 0.2s ease;
+}
+
+.message-avatar:hover {
+  transform: scale(1.05);
+}
+
+.message-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .message-username {
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 4px;
-  font-size: 14px;
+  font-weight: 500;
+  color: #2c3e50;
+  font-size: 15px;
+  line-height: 1.2;
 }
 
 .message-time {
   font-size: 12px;
-  color: #999;
-  margin-left: 8px;
+  color: #909399;
   font-weight: normal;
 }
 

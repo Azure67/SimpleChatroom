@@ -7,7 +7,6 @@ const password = ref('');
 
 const login = () => {
     console.log(username.value, password.value);
-    
 }
 </script>
 

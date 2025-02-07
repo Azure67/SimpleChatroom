@@ -1,6 +1,6 @@
 <script setup>
 import {nextTick, onMounted, onUnmounted, ref, watch} from 'vue';
-import {User, Files, UploadFilled, Picture, DocumentAdd} from "@element-plus/icons-vue"
+import {User, Files, UploadFilled, Picture, DocumentAdd, Back, Plus} from "@element-plus/icons-vue"
 import {useUserStore} from "@/store/index.js";
 import {useRouter} from "vue-router";
 import data from "emoji-mart-vue-fast/data/all.json";
@@ -8,6 +8,7 @@ import "emoji-mart-vue-fast/css/emoji-mart.css";
 import {EmojiIndex, Picker} from "emoji-mart-vue-fast/src";
 import axios from "axios";
 import Socket from "@/socket.js";
+import { ElMessage } from 'element-plus'
 
 const user_button = ref()
 const FileUpload = ref()
@@ -16,8 +17,9 @@ const PictureList=ref([])
 const FileList=ref([])
 const emojiIndex = new EmojiIndex(data)
 const showEmojiDialog = ref(false)
+const showSetAvatarDialog=ref(false)
 const IP = import.meta.env.VITE_IP;
-const PORT=import.meta.env.PORT
+const PORT=import.meta.env.VITE_PORT
 const is_HTML = ref(false);
 const aiUserList=ref(['机器人','星火大模型'])
 const router = useRouter();
@@ -32,6 +34,8 @@ const mention_options=ref([])
 const showFileDialog=ref(false)
 const showPictureDialogInFileDialog=ref(false)
 const showFileDialogInFIleDialog=ref(false)
+const avatarUrl = ref('')
+const avatarFile = ref(null)
 
 const CHUNK_SIZE = 1024 * 1024;
 
@@ -361,19 +365,13 @@ const sendMsgToSocket = (id, username, content, time,is_HTML,Type) => {
     msg_type:Type
   });
 };
-Socket.on("allUser",(data)=>{
-  console.log(data.userList)
-  userList.value.map((value)=>{
-    if (!value){
-      return value
-    }
-  })
-  userList.value=data.userList
-  console.log(userList.value)
-  getUserCountData()
-  mention_options.value=[]
-  getMention_options()
-})
+Socket.on("allUser", async (data) => {
+  userList.value = data.userList.filter(value => value);
+  getUserCountData();
+  mention_options.value = [];
+  getMention_options();
+  await initializeAvatars();
+});
 Socket.on("getMsg", (data) => {
   messages.value.push(data);
   scrollToBottom();
@@ -423,10 +421,29 @@ const scrollToBottom = () => {
 watch(messages,(nv,ov)=>{
   userStore.setMsgList(nv)
 },{deep:true})
-onMounted(() => {
+const initializeAvatars = async () => {
+  try {
+    // 先加载当前用户的头像
+    await userStore.loadUserAvatar(userStore.username);
+    // 再加载其他用户的头像
+    await userStore.loadAllAvatars(userList.value);
+  } catch (error) {
+    console.error('初始化头像失败:', error);
+  }
+};
+
+// 添加刷新头像的函数
+const refreshUserAvatar = async () => {
+  try {
+    await userStore.refreshAvatar(userStore.username);
+  } catch (error) {
+    console.error('刷新头像失败:', error);
+  }
+};
+
+onMounted(async () => {
   Socket.emit("checkUserInDatabase", {username: userStore.username});
   
-
   if (!localStorage.getItem('username')) {
     Socket.emit("newUserJoin", {
       username: userStore.username
@@ -436,6 +453,19 @@ onMounted(() => {
   getUserCountData();
   scrollToBottom();
   window.addEventListener('paste', handlePaste);
+  
+  try {
+    const response = await axios.post(`http://${IP}:${PORT}/getUserAvatar`, {
+      username: userStore.username
+    });
+    if (response.data.code === "0") {
+      userStore.setAvatar(response.data.avatar);
+    }
+  } catch (error) {
+    console.error('获取头像失败:', error);
+  }
+  
+  await initializeAvatars();
 });
 onUnmounted(() => {
   Socket.off('userjoin');
@@ -453,18 +483,165 @@ onUnmounted(() => {
   
   window.removeEventListener('paste', handlePaste);
 });
+
+const compressImage = (file) => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.src = e.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        // 最大尺寸限制
+        const maxSize = 800;
+        if (width > height && width > maxSize) {
+          height = Math.round((height * maxSize) / width);
+          width = maxSize;
+        } else if (height > maxSize) {
+          width = Math.round((width * maxSize) / height);
+          height = maxSize;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // 压缩图片质量
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        resolve(compressedDataUrl);
+      };
+    };
+  });
+};
+
+const handleAvatarChange = async (file) => {
+  if (!file.raw.type.startsWith('image/')) {
+    ElMessage.error('只能上传图片文件!')
+    return false
+  }
+  
+  const isLt5M = file.raw.size / 1024 / 1024 < 5
+  if (!isLt5M) {
+    ElMessage.error('图片大小不能超过 5MB!')
+    return false
+  }
+  
+  try {
+    // 压缩图片
+    const compressedDataUrl = await compressImage(file.raw);
+    avatarUrl.value = compressedDataUrl;
+    avatarFile.value = file.raw;
+  } catch (error) {
+    console.error('图片处理失败:', error);
+    ElMessage.error('图片处理失败，请重试');
+  }
+  
+  return false;
+};
+
+const submitAvatar = async () => {
+  if (!avatarUrl.value) {
+    ElMessage.warning('请先选择头像图片')
+    return
+  }
+
+  try {
+    const response = await axios.post(`http://${IP}:${PORT}/setUserAvatar`, {
+      username: userStore.username,
+      avatar: avatarUrl.value
+    }, {
+      timeout: 30000,
+      maxBodyLength: Infinity,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (response.data.code === 0) {
+      ElMessage.success('头像设置成功')
+      userStore.setAvatar(avatarUrl.value)
+      showSetAvatarDialog.value = false
+      avatarUrl.value = ''
+      avatarFile.value = null
+      // 设置成功后刷新头像
+      await refreshUserAvatar();
+    } else {
+      throw new Error(response.data.message || '设置失败')
+    }
+  } catch (error) {
+    console.error('设置头像失败:', error)
+    ElMessage.error(error.response?.data?.message || '设置头像失败，请重试')
+  }
+};
 </script>
 <template>
   <div class="chat-container">
     <header class="chat-header">
-      <el-button class="exit-button" @click="exitChat" text>Exit</el-button>
-      <div class="chat-title">Chatroom</div>
-      <el-button class="user-button" ref="user_button" @click="showUserDrawer=true">
-        <el-icon><User /></el-icon>
-        {{`当前人数:${userList.length}`}}
-      </el-button>
+      <div class="header-left">
+        <el-button class="exit-button" @click="exitChat" type="primary" text>
+          <el-icon><Back /></el-icon>
+          <span>退出</span>
+        </el-button>
+      </div>
+      
+      <div class="chat-title">
+        <span>聊天室</span>
+        <div class="online-count">在线 {{userList.length}}</div>
+      </div>
+      
+      <div class="header-right">
+        <el-button 
+          class="user-stats-button" 
+          @click="showUserDrawer=true"
+          type="primary"
+          text
+        >
+          <el-icon><User /></el-icon>
+          <span>用户统计</span>
+        </el-button>
+        
+        <div class="user-info">
+          <el-button 
+            class="avatar-button"
+            @click="showSetAvatarDialog=true"
+            type="primary"
+            text
+          >
+            <span class="username">{{userStore.username}}</span>
+            <el-avatar 
+              :size="36" 
+              :src="userStore.getAvatar(userStore.username)"
+              class="user-avatar"
+            />
+          </el-button>
+        </div>
+      </div>
     </header>
-
+    <el-dialog v-model="showSetAvatarDialog" title="设置头像" width="500px" :close-on-click-modal="false">
+      <el-upload
+        class="avatar-uploader"
+        :show-file-list="false"
+        :auto-upload="false"
+        :on-change="handleAvatarChange"
+        accept="image/*"
+      >
+        <img v-if="avatarUrl" :src="avatarUrl" class="avatar-preview"/>
+        <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
+      </el-upload>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showSetAvatarDialog = false">取消</el-button>
+          <el-button type="primary" @click="submitAvatar">确认</el-button>
+        </div>
+      </template>
+    </el-dialog>
     <el-drawer 
       v-model="showUserDrawer" 
       direction="rtl" 
@@ -606,21 +783,100 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 2rem;
-  background-color: #fff;
-  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+  padding: 0.8rem 1.5rem;
+  background-color: var(--el-bg-color);
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.05);
+  height: 60px;
+}
+
+.header-left,
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .chat-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #303133;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
 }
 
-.exit-button,
-.user-button {
-  padding: 0.5rem 1rem;
+.chat-title span {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.online-count {
+  font-size: 0.8rem;
+  color: var(--el-text-color-secondary);
+  background-color: var(--el-color-primary-light-9);
+  padding: 0.1rem 0.8rem;
+  border-radius: 12px;
+}
+
+.user-stats-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.9rem;
+  padding: 8px 16px;
+  border-radius: 8px;
   transition: all 0.3s ease;
+}
+
+.user-stats-button:hover {
+  background-color: var(--el-color-primary-light-9);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+}
+
+.avatar-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  transition: all 0.3s ease;
+}
+
+.avatar-button:hover {
+  background-color: var(--el-color-primary-light-9);
+}
+
+.username {
+  font-size: 0.95rem;
+  color: var(--el-text-color-primary);
+  margin-right: 4px;
+}
+
+.user-avatar {
+  border: 2px solid var(--el-color-primary-light-5);
+  transition: transform 0.3s ease;
+}
+
+.user-avatar:hover {
+  transform: scale(1.05);
+}
+
+.exit-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.9rem;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.exit-button:hover {
+  background-color: var(--el-color-danger-light-9);
+  color: var(--el-color-danger);
 }
 
 .chat-messages {
@@ -798,5 +1054,44 @@ onUnmounted(() => {
   width: 100%;
   height: auto;
   position: relative;
+}
+
+.avatar-uploader {
+  text-align: center;
+}
+
+.avatar-uploader :deep(.el-upload) {
+  border: 1px dashed #d9d9d9;
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: var(--el-transition-duration-fast);
+}
+
+.avatar-uploader :deep(.el-upload:hover) {
+  border-color: var(--el-color-primary);
+}
+
+.avatar-preview {
+  width: 178px;
+  height: 178px;
+  object-fit: cover;
+}
+
+.avatar-uploader-icon {
+  font-size: 28px;
+  color: #8c939d;
+  width: 178px;
+  height: 178px;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.dialog-footer {
+  margin-top: 20px;
+  text-align: right;
 }
 </style>

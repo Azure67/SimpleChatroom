@@ -5,7 +5,8 @@ import axios from "axios";
 import {useRouter} from "vue-router";
 import {User,Lock} from "@element-plus/icons-vue";
 import Socket from "@/socket.js";
-
+import {Base64} from "js-base64";
+import {md5} from "js-md5";
 
 const IP = import.meta.env.VITE_IP
 const PORT = import.meta.env.VITE_PORT
@@ -141,7 +142,14 @@ const user_login=async ()=>{
     ElMessage.error('登录请求失败，请重试');
   }
 }
-
+const password_encode = (text)=>{
+  var new_text = text + Date.now()
+  var base64_text = Base64.encode(new_text)
+  base64_text = Array.prototype.slice.call(base64_text).reverse().join("")
+  var md5_text=md5(base64_text)
+  md5_text=Array.prototype.slice.call(md5_text).reverse().join("")
+  return md5_text
+}
 onUnmounted(() => {
   Socket.off('connect');
   Socket.off('connect_error');
