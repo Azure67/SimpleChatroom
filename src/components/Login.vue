@@ -252,10 +252,14 @@ onUnmounted(() => {
 
 .form-container {
   margin-top: 1rem;
+  display: flex;
+  justify-content: center;
 }
 
 .login, .register {
   width: 100%;
+  display: flex;
+  justify-content: center;
 }
 
 .form-button {
@@ -292,5 +296,12 @@ onUnmounted(() => {
 
 :deep(.el-form-item) {
   margin-bottom: 20px;
+}
+
+:deep(.el-form) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
 }
 </style>

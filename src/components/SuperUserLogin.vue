@@ -12,7 +12,7 @@ const login = () => {
 
 <template>
   <div class="login-container">
-    <h1>超级用户登录</h1>
+    <h1>管理员登录</h1>
     <div class="login-form">
       <el-input 
         v-model="username"
