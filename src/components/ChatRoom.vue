@@ -432,7 +432,6 @@ const initializeAvatars = async () => {
   }
 };
 
-// 添加刷新头像的函数
 const refreshUserAvatar = async () => {
   try {
     await userStore.refreshAvatar(userStore.username);

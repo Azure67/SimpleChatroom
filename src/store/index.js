@@ -10,15 +10,13 @@ export const useUserStore = defineStore('user', () => {
     const msgList=ref([])
     const islogin=ref(false)
     const userAvatar=ref({})
-    
-    // 初始化时加载所有在线用户的头像
+
     const loadAllAvatars = async (userList) => {
         for (const name of userList) {
             await loadUserAvatar(name);
         }
     }
 
-    // 加载单个用户头像
     const loadUserAvatar = async (name) => {
         if (!userAvatar.value[name]) {
             try {
@@ -59,7 +57,6 @@ export const useUserStore = defineStore('user', () => {
         userAvatar.value[username.value] = avatar;
     }
 
-    // 刷新头像
     const refreshAvatar = async (name) => {
         try {
             const response = await axios.post(`http://${IP}:${PORT}/getUserAvatar`, {

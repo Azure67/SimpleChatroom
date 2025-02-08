@@ -59,11 +59,8 @@ const downloadFile = () =>{
 }
 onMounted(async () => {
   if (props.msg.username) {
-    // 先使用缓存的头像
     avatar.value = userStore.getAvatar(props.msg.username);
-    // 然后异步加载最新头像
     await userStore.loadUserAvatar(props.msg.username);
-    // 更新显示
     avatar.value = userStore.getAvatar(props.msg.username);
   }
 });
