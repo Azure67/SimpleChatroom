@@ -3,6 +3,7 @@ import Login from '@/components/Login.vue';
 import ChatRoom from '@/components/ChatRoom.vue';
 import {useUserStore} from "@/store/index.js";
 import SuperUserLogin from '@/components/SuperUserLogin.vue';
+import AdminDashboard from "@/components/AdminDashboard.vue";
 
 const routes = [
     {
@@ -31,6 +32,11 @@ const routes = [
         path:'/superuserLogin',
         name:'SuperUserLogin',
         component:SuperUserLogin
+    },
+    {
+        path: '/adminDashboard',
+        name: 'AdminDashboard',
+        component: AdminDashboard
     }
 ];
 

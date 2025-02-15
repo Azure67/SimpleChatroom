@@ -1,12 +1,23 @@
 <script setup>
 import { ref } from 'vue';
 import { User, Lock } from '@element-plus/icons-vue';
+import axios from "axios";
+import {useRouter} from "vue-router";
 
+const router = useRouter()
 const username = ref('');
 const password = ref('');
-
-const login = () => {
-    console.log(username.value, password.value);
+const IP = import.meta.env.VITE_IP
+const PORT = import.meta.env.VITE_PORT
+const login = async () => {
+   await axios.post(`http://${IP}:${PORT}/superuserLogin`,{username:username.value,password:password.value}).then((res)=>{
+      if (res.data.code===0){
+        ElMessage.success(res.data.message)
+        router.push('/adminDashboard')
+      }else {
+        ElMessage.error(res.data.message)
+      }
+   })
 }
 </script>
 
@@ -24,7 +35,7 @@ const login = () => {
         type="password"
         placeholder="请输入密码"
         :prefix-icon="Lock"
-        show-password
+        show-passwordMicrosoft.QuickAction.WiFi
       ></el-input>
       <el-button type="primary" @click="login" class="login-button">登录</el-button>
     </div>
