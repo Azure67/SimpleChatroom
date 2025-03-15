@@ -260,7 +260,7 @@ io.of('/groupChat').on('connection',(socket)=>{
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        timeout: 30000
+                        timeout: 90000
                     });
                     
                     if (response.data && response.data.code === "0") {
