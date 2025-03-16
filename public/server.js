@@ -16,6 +16,11 @@ import { dirname } from 'path';
 dotenv.config({path:path.resolve(path.dirname(fileURLToPath(import.meta.url)),"../.env")})
 const IP=process.env.IP
 const port = process.env.PORT
+const FILE_SAVE_PATH = process.env.FILE_SAVE_PATH
+const DATABASE_HOST = process.env.DATABASE_HOST
+const DATABASE_USER = process.env.DATABASE_USER
+const DATABASE_PASSWORD = process.env.DATABASE_PASSWORD
+const DATABASE_NAME = process.env.DATABASE_NAME
 const app = express()
 app.use(timeout('20m'))
 const server = http.createServer(app);
@@ -23,7 +28,7 @@ const io = new Server(server,{
     cors:true,
     maxHttpBufferSize:5 * 1024 * 1024 * 1024
 })
-app.use(express.static('E:\\simpleChatroomFile'))
+app.use(express.static(FILE_SAVE_PATH))
 const sparkAiHistories={}
 const sparkAiHistoriesToken= {}
 const deepseek_chatHistory={}
@@ -33,7 +38,7 @@ const deepseek_reasonerHistoryToken={}
 const userMessageNumCount= {}
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, 'E:/simpleChatroomFile');
+        cb(null, FILE_SAVE_PATH);
     },
     filename: function (req, file, cb) {
         cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
@@ -409,10 +414,11 @@ const getSparkAiHeaders = (API_PASSWORD)=>{
     };
 }
 const pool = mysql.createPool({
-    host: 'localhost',
-    user: 'root',
-    password: '123456',
-    database: 'chatroom',
+    host: DATABASE_HOST,
+    user: DATABASE_USER,
+    password: DATABASE_PASSWORD,
+    database: DATABASE_NAME,
+    port:3306,
     connectionLimit: 10,
     connectTimeout: 10000,
     acquireTimeout: 10000,
