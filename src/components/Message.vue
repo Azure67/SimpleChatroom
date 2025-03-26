@@ -109,7 +109,16 @@ watch(() => userStore.getAvatar(props.msg.username), (newAvatar) => {
     </div>
   </div>
   <div class="message-content markdown-content" v-else-if="props.msg.msg_type===5">
-    <v-md-preview :text="props.msg.content"></v-md-preview>
+    <div class="reasoning-section"v-if="props.msg.username==='deepseek-reasoner'">
+      <div class="reasoning-header">
+        <i class="el-icon-lightbulb"></i>
+        <span>思考过程</span>
+      </div>
+      <v-md-preview :text="props.msg.reasoning_content"></v-md-preview>
+    </div>
+    <div class="answer-section">
+      <v-md-preview :text="props.msg.content"></v-md-preview>
+    </div>
   </div>
   <div class="message-content" v-else-if="props.msg.msg_type===6">
     <video v-if="videoUrl" :src="videoUrl" controls></video>
@@ -176,6 +185,31 @@ watch(() => userStore.getAvatar(props.msg.username), (newAvatar) => {
   background: transparent;
   border: none;
   padding: 0;
+}
+
+.reasoning-section {
+  background-color: #f8f9fa;
+  border-left: 4px solid #95a5a6;
+  margin-bottom: 16px;
+  padding: 12px;
+  border-radius: 4px;
+}
+
+.reasoning-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #7f8c8d;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.answer-section {
+  background-color: #fff;
+  border-left: 4px solid #3498db;
+  padding: 12px;
+  border-radius: 4px;
 }
 
 .markdown-content :deep(.v-md-editor__preview-wrapper) {

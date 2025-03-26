@@ -12,6 +12,7 @@ import dotenv from 'dotenv'
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import * as deepseek from "./deepseek.js"
 
 dotenv.config({path:path.resolve(path.dirname(fileURLToPath(import.meta.url)),"../.env")})
 const IP=process.env.IP
@@ -31,10 +32,6 @@ const io = new Server(server,{
 app.use(express.static(FILE_SAVE_PATH))
 const sparkAiHistories={}
 const sparkAiHistoriesToken= {}
-const deepseek_chatHistory={}
-const deepseek_chatHistoryToken={}
-const deepseek_reasonerHistory={}
-const deepseek_reasonerHistoryToken={}
 const userMessageNumCount= {}
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -269,28 +266,39 @@ io.of('/groupChat').on('connection',(socket)=>{
                     });
                     
                     if (response.data && response.data.code === "0") {
-                        io.of('/groupChat').emit('getMsg', {
-                            id: Date.now(),
-                            username: model_type.slice(1),
-                            content: response.data.message.aiMsg,
-                            time: formatTime(new Date()),
-                            is_HTML: false,
-                            msg_type: 5
-                        });
-                        if(model_type === "@星火大模型"){
+                        if(model_type==="@deepseek-reasoner"){
                             io.of('/groupChat').emit('getMsg', {
                                 id: Date.now(),
                                 username: model_type.slice(1),
-                                content:`### Token 消耗信息
-                                - 用户信息消耗 token 数: ${response.data.message.token.prompt_tokens}
-                                - 机器人信息消耗 token 数: ${response.data.message.token.completion_tokens}
-                                - 本次回复总消耗 token 数:${response.data.message.token.total_tokens}`,
+                                content: response.data.message.content,
+                                reasoning_content:response.data.message.reasoning_content,
+                                time: formatTime(new Date()),
+                                is_HTML: false,
+                                msg_type: 5
+                            });
+                        }else{
+                            io.of('/groupChat').emit('getMsg', {
+                                id: Date.now(),
+                                username: model_type.slice(1),
+                                content: response.data.message.aiMsg,
                                 time: formatTime(new Date()),
                                 is_HTML: false,
                                 msg_type: 5
                             });
                         }
-
+                        // if(model_type === "@星火大模型"){
+                        //     io.of('/groupChat').emit('getMsg', {
+                        //         id: Date.now(),
+                        //         username: model_type.slice(1),
+                        //         content:`### Token 消耗信息
+                        //         - 用户信息消耗 token 数: ${response.data.message.token.prompt_tokens}
+                        //         - 机器人信息消耗 token 数: ${response.data.message.token.completion_tokens}
+                        //         - 本次回复总消耗 token 数:${response.data.message.token.total_tokens}`,
+                        //         time: formatTime(new Date()),
+                        //         is_HTML: false,
+                        //         msg_type: 5
+                        //     });
+                        // }
                     } else {
                         throw new Error(response.data.message || '机器人响应异常');
                     }
@@ -727,7 +735,7 @@ app.post('/getUserPermission',async (req,res)=>{
 //  message 机器人说的话
 // 传入
 // 用户名 username
-// 机器人类型 model_type 星火大模型 deepseek-chat deepseek-reasoner  机器人
+// 机器人类型 model_type @星火大模型 @deepseek-chat @deepseek-reasoner  @机器人
 // 发送的信息 Msg
 app.post('/getRobotMsg', async (req, res) => {
     try {
@@ -763,7 +771,33 @@ app.post('/getRobotMsg', async (req, res) => {
                     message: `星火API调用失败: ${err.message}`
                 });
             }
-        } else if (model_type === "@机器人") {
+        } else if(model_type === "@deepseek-chat") {
+            try {
+                await deepseek.getDeepseekMsg("v3",Msg,username).then(res=>{
+                    robotMsg={
+                        aiMsg:res.content
+                    }
+                })
+            } catch (err) {
+                console.error('deepseekAPI调用错误:', err);
+                return res.status(500).json({
+                    code: "1",
+                    message: `deepseekAPI调用失败: ${err.message}`
+                });
+            }
+        }else if(model_type === "@deepseek-reasoner"){
+                try {
+                    await deepseek.getDeepseekMsg("r1",Msg,username).then(res=>{
+                        robotMsg={content:res.content,reasoning_content:res.reasoning_content}
+                    })
+                } catch (err) {
+                    console.error('deepseekAPI调用错误:', err);
+                    return res.status(500).json({
+                        code: "1",
+                        message: `deepseekAPI调用失败: ${err.message}`
+                    });
+                }
+        }else if (model_type === "@机器人") {
             try {
                 if (Msg === "开启代理") {
                     const proxyInfo = await launchProxy();
