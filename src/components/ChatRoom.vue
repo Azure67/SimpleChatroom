@@ -155,7 +155,7 @@ const sendMessage = () => {
     msg_type:msg_type
   });
   aiUserList.value.forEach((value)=>{
-    if (inputMessage.value.startsWith(`@${value}`)){
+    if (inputMessage.value.split(' ')[0] === `@${value}`){
       msg_type=4
     }
   })

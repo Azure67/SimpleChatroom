@@ -6,12 +6,12 @@ import {Server} from 'socket.io'
 import axios from "axios";
 import multer from 'multer';
 import path from 'path';
-import {writeFile,readFile,existsSync,appendFile} from 'fs'
+import {writeFile,readFile,existsSync,appendFile,createWriteStream} from 'fs'
 import timeout from 'connect-timeout'
 import dotenv from 'dotenv'
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { dirname,join } from 'path';
 import * as deepseek from "./deepseek.js"
 
 dotenv.config({path:path.resolve(path.dirname(fileURLToPath(import.meta.url)),"../.env")})
@@ -22,6 +22,20 @@ const DATABASE_HOST = process.env.DATABASE_HOST
 const DATABASE_USER = process.env.DATABASE_USER
 const DATABASE_PASSWORD = process.env.DATABASE_PASSWORD
 const DATABASE_NAME = process.env.DATABASE_NAME
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+// 定义日志文件路径
+const logFilePath = path.join(__dirname, 'app.log');
+// 创建日志写入流
+const logStream = createWriteStream(logFilePath, { flags: 'a' });
+const originalConsoleLog = console.log;
+// 重写 console.log
+console.log = function (...args) {
+    const timestamp = new Date().toISOString();
+    const logMessage = `[${timestamp}] ${args.join(' ')}\n`;
+    logStream.write(logMessage);
+    originalConsoleLog.apply(console, args);
+};
 const app = express()
 app.use(timeout('20m'))
 const server = http.createServer(app);
@@ -64,9 +78,6 @@ const formatTime = (date) => {
 let proxyProcess = null;
 let proxyInfo = null;
 let proxyTimer = null;
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 // 代理
 const launchProxy = async () => {
@@ -327,7 +338,7 @@ io.of('/groupChat').on('connection',(socket)=>{
 
     socket.on('uploadChunk', (data, callback) => {
         const {fileMsg, chunk, chunkIndex, totalChunks} = data;
-        const filePath = `E:\\simpleChatroomFile\\${fileMsg.fileSaveName}`;
+        const filePath = `${FILE_SAVE_PATH}\\${fileMsg.fileSaveName}`;
         appendFile(filePath, Buffer.from(chunk), (err) => {
             if (err) {
                 console.error('写入分片失败:', err);
@@ -370,7 +381,7 @@ io.of('/groupChat').on('connection',(socket)=>{
     });
     socket.on('downloadFile',(filepath,fileShowName)=>{
         console.log(`下载文件${filepath}`)
-        readFile(`E:\\simpleChatroomFile\\${filepath}`,(err,data)=>{
+        readFile(`${FILE_SAVE_PATH}\\${filepath}`,(err,data)=>{
             if (err) {
                 console.error(err);
                 return;
