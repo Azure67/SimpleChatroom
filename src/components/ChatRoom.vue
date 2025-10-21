@@ -406,7 +406,7 @@ Socket.on("checkUserInDatabase",(data)=>{
   Socket.close();
   router.push('/');
   if (data.exists===0){
-    ElMessage.error("非法手段进入")
+    ElMessage.error("非法进入")
   }else {
     ElMessage.error("数据库错误，请联系管理员")
   }

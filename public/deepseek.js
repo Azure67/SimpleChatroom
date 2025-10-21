@@ -5,10 +5,11 @@ import { fileURLToPath } from 'url';
 
 dotenv.config({path:path.resolve(path.dirname(fileURLToPath(import.meta.url)),"../.env")})
 const DEEPSEEK_API_KEY=process.env.DEEPSEEK_API_KEY
+const DEEPSEEK_API_URL=process.env.DEEPSEEK_API_URL
 const tools=[]
 
 const openai = new OpenAI({
-    baseURL: 'https://api.deepseek.com',
+    baseURL: `${DEEPSEEK_API_URL}`,
     apiKey: `${DEEPSEEK_API_KEY}`,
     timeout:240000
 });
@@ -67,8 +68,7 @@ async function getDeepseekMsg(model, message, userId) {
     const response = await openai.chat.completions.create({
         model: deepseel_model,
         messages: fullMessages,
-        tool_choice:'auto',
-        tools:tools
+        tool_choice:'auto'
     });
 
     addMessageToContext(userId, newMessage);

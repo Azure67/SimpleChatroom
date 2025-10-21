@@ -22,6 +22,8 @@ const DATABASE_HOST = process.env.DATABASE_HOST
 const DATABASE_USER = process.env.DATABASE_USER
 const DATABASE_PASSWORD = process.env.DATABASE_PASSWORD
 const DATABASE_NAME = process.env.DATABASE_NAME
+const SPARK_API_URL = process.env.SPARK_API_URL
+const SPARK_API_KEY = process.env.SPARK_API_KEY
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 // 定义日志文件路径
@@ -529,16 +531,16 @@ const getSparkaiMsg = async (username, message) => {
             sparkAiHistoriesToken[username] = 0
         }
 
-        const headers = getSparkAiHeaders(process.env.SPARK_API_KEY);
+        const headers = getSparkAiHeaders(SPARK_API_KEY);
         const maxRetries = 3;
         let retryCount = 0;
         
         while (retryCount < maxRetries) {
             try {
                 const response = await axios.post(
-                    "https://spark-api-open.xf-yun.com/v1/chat/completions",
+                    SPARK_API_URL,
                     {
-                        model: 'generalv3.5',
+                        model: 'x1',
                         user: username,
                         messages: sparkAiHistories[username]
                     },
