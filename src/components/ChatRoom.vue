@@ -347,13 +347,26 @@ Socket.on("userjoin", (data) => {
 });
 
 Socket.on("levelChatroom", (data) => {
+  let messageContent = `${data.name}离开了聊天室`;
+  if (data.reason === 'kicked') {
+    messageContent = `${data.name}被踢出聊天室`;
+  }
   messages.value.push({
     id: Date.now(),
-    content: `${data.name}离开了聊天室`,
+    content: messageContent,
     time: formatTime(new Date()),
   });
   scrollToBottom();
 });
+Socket.on('userKicked',(data)=>{
+  ElMessage.error("你被踢出聊天室")
+  router.push("/")
+  localStorage.removeItem('username');
+  userStore.setname("")
+  userStore.setlogin(false)
+  messages.value = []
+  scrollToBottom();
+})
 
 const sendMsgToSocket = (id, username, content, time,is_HTML,Type) => {
   Socket.emit("sendMsg", {
@@ -442,7 +455,7 @@ const refreshUserAvatar = async () => {
 
 onMounted(async () => {
   Socket.emit("checkUserInDatabase", {username: userStore.username});
-  
+
   if (!localStorage.getItem('username')) {
     Socket.emit("newUserJoin", {
       username: userStore.username

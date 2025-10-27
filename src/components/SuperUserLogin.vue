@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { User, Lock } from '@element-plus/icons-vue';
 import axios from "axios";
 import {useRouter} from "vue-router";
+import Socket from "@/socket.js";
 
 const router = useRouter()
 const username = ref('');
@@ -13,6 +14,7 @@ const login = async () => {
    await axios.post(`http://${IP}:${PORT}/superuserLogin`,{username:username.value,password:password.value}).then((res)=>{
       if (res.data.code===0){
         ElMessage.success(res.data.message)
+        Socket.connect()
         router.push('/adminDashboard')
       }else {
         ElMessage.error(res.data.message)

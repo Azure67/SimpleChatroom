@@ -406,6 +406,26 @@ io.of('/groupChat').on('connection',(socket)=>{
             userMessageNumCount
         });
     });
+    socket.on('kickUser',(username)=>{
+        const sockets = io.of('/groupChat').sockets
+        let targetSocket = null;
+        sockets.forEach((value)=>{
+            if (username===value.username){
+                targetSocket = value;
+            }
+        });
+        if (targetSocket) {
+            targetSocket.emit('userKicked', {name: username});
+            socket.broadcast.emit('levelChatroom', {
+                name: username,
+                reason: 'kicked'
+            });
+            targetSocket.disconnect();
+            console.log(`${username}被管理员踢出`);
+            console.log(getAllOnlineGroupMembers());
+            io.of('/groupChat').emit('allUser', { userList: getAllOnlineGroupMembers() });
+        }
+    })
 })
 
 const getAllOnlineGroupMembers = () => {
@@ -481,6 +501,14 @@ const getUserAvatar=async (user)=>{
         return results[0].avatar
     }catch (e) {
         console.error(`获取用户${user}头像失败:`,e)
+    }
+}
+const getRegularUser = async () =>{
+    try {
+        const result = await usequery(`select name from user where permission=0`)
+        return result.map(user => user.name)
+    }catch (e) {
+        console.error(`获取普通用户列表失败`)
     }
 }
 const setUserAvatar=async (username,avatar)=>{
@@ -599,9 +627,7 @@ const checkInputPwd = async (username,password)=>{
         return 0
     }
 }
-const getDeepseekMsg= async (username,message)=>{
 
-}
 // 是否是管理员
 const isAdministrator = async (username)=>{
     const dbUserList = await getAllDBUser()
@@ -654,6 +680,10 @@ app.post('/createUser', async (req, res) => {
         const password = req.body.password;
         if (!username || !password) {
             return res.status(400).send('Username and password are required');
+        }
+        const regex = /^[^\s]{6,15}$/;
+        if (!regex.test(password)){
+            return res.status(400).send('password are required');
         }
         const qdata = await usequery(`INSERT into user(name,password,permission) VALUES(?,?,?)`,[username,password,0])
         if (qdata.affectedRows > 0){
@@ -949,5 +979,13 @@ app.post('/setUserAvatar',async (req,res)=>{
     return res.status(200).send(JSON.stringify({
         code:0,
         message:message
+    }))
+})
+// 获取
+app.post('/getRegularUser',async (req,res)=>{
+    const regularUserList = await getRegularUser();
+    return res.status(200).send(JSON.stringify({
+        code:0,
+        userList:regularUserList
     }))
 })
