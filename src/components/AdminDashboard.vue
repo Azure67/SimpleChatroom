@@ -37,6 +37,12 @@ const kickUser = async (username) =>{
     await getRegularUserFormData()
   }, 500)
 }
+Socket.on('userjoin',async (data)=>{
+  await getRegularUserFormData()
+})
+Socket.on('levelChatroom',async (data)=>{
+  await getRegularUserFormData()
+})
 onMounted(()=>{
   getRegularUserList()
 })

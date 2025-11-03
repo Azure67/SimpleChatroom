@@ -574,7 +574,7 @@ const getSparkaiMsg = async (username, message) => {
                     },
                     {
                         headers,
-                        timeout: 60000  // 增加超时时间到60秒
+                        timeout: 60000
                     }
                 ).catch((err)=>{
                     console.log(`SparkAPI请求错误: ${err.message}`)
