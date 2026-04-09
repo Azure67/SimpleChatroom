@@ -94,6 +94,11 @@ const getMention_options=()=>{
       value:value,
     })
   })
+  // 添加代理使用示例
+  mention_options.value.push({
+    label: '代理使用示例',
+    value: '@机器人 开启代理 192.168.1.100',
+  })
   console.log(mention_options.value)
 }
 const getUserCountData = () => {
@@ -144,8 +149,28 @@ const exitChat = () => {
 
 const sendMessage = () => {
   if (inputMessage.value.trim() === '') return;
+  
+  // 检查是否是代理相关的命令
+  if (inputMessage.value.startsWith('@机器人')) {
+    const command = inputMessage.value.substring(4).trim(); // 移除"@机器人"前缀
+    
+    // 如果是开启代理且带有IP地址的命令，提示用户使用新格式
+    if (command.startsWith('开启代理 ') && command.split(' ').length > 1) {
+      const parts = command.split(' ');
+      if (parts.length >= 2) {
+        const ipAddr = parts[1];
+        // 验证IP地址格式
+        const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+        if (!ipRegex.test(ipAddr)) {
+          ElMessage.error('IP地址格式不正确，请使用正确的IPv4地址格式（如：192.168.1.100）');
+          return;
+        }
+      }
+    }
+  }
+  
   const currentTime = new Date();
-  let msg_type=1
+  let msg_type=1;
   messages.value.push({
     id: Date.now(),
     username: userStore.username,
@@ -378,6 +403,20 @@ const sendMsgToSocket = (id, username, content, time,is_HTML,Type) => {
     msg_type:Type
   });
 };
+
+// 添加显示代理帮助信息的函数
+const showProxyHelp = () => {
+  messages.value.push({
+    id: Date.now(),
+    username: '系统提示',
+    content: '代理功能更新：\n- 使用"@机器人 开启代理"自动获取IP\n- 使用"@机器人 开启代理 [IP地址]"手动指定IP（如：192.168.1.100）\n- 使用"@机器人 关闭代理"关闭服务\n- 使用"@机器人 帮助代理"获取帮助',
+    time: formatTime(new Date()),
+    is_HTML: false,
+    msg_type: 1
+  });
+  scrollToBottom();
+};
+
 Socket.on("allUser", async (data) => {
   userList.value = data.userList.filter(value => value);
   getUserCountData();

@@ -82,7 +82,7 @@ let proxyInfo = null;
 let proxyTimer = null;
 
 // 代理
-const launchProxy = async () => {
+const launchProxy = async (ipType = 'auto', customIp = null) => {
     try {
         if (proxyInfo) {
             if (proxyTimer) {
@@ -194,7 +194,8 @@ const launchProxy = async () => {
                 });
 
                 console.log('向代理发送配置...');
-                proxyProcess.stdin.write('1\n');
+                proxyProcess.stdin.write(`${ipType}\n`);
+                proxyProcess.stdin.write(`${customIp || '127.0.0.1'}\n`);
                 proxyProcess.stdin.write(`${randomPort}\n`);
                 console.log('配置已发送');
 
@@ -843,7 +844,7 @@ app.post('/getRobotMsg', async (req, res) => {
         }else if (model_type === "@机器人") {
             try {
                 if (Msg === "开启代理") {
-                    const proxyInfo = await launchProxy();
+                    const proxyInfo = await launchProxy('auto');
                     if (proxyInfo && proxyInfo.ip && proxyInfo.port) {
                         return res.status(200).json({
                             code: "0",
@@ -853,6 +854,36 @@ app.post('/getRobotMsg', async (req, res) => {
                         });
                     } else {
                         throw new Error('代理信息无效');
+                    }
+                } else if (Msg.startsWith("开启代理 ")) {
+                    // 解析用户指定的IP地址
+                    const parts = Msg.split(' ');
+                    if (parts.length >= 2) {
+                        const ipAddress = parts[1].trim();
+                        // 验证IP地址格式
+                        const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+                        if (!ipRegex.test(ipAddress)) {
+                            return res.status(200).json({
+                                code: "0",
+                                message: {aiMsg: "IP地址格式不正确，请使用正确的IPv4地址格式（如：192.168.1.100）"}
+                            });
+                        }
+                        const proxyInfo = await launchProxy('manual', ipAddress);
+                        if (proxyInfo && proxyInfo.ip && proxyInfo.port) {
+                            return res.status(200).json({
+                                code: "0",
+                                message: {
+                                    aiMsg: `代理开启成功，地址为 ${proxyInfo.ip}:${proxyInfo.port}\n代理将在 ${proxyInfo.autoCloseTime} 自动关闭`
+                                }
+                            });
+                        } else {
+                            throw new Error('代理信息无效');
+                        }
+                    } else {
+                        return res.status(200).json({
+                            code: "0",
+                            message: {aiMsg: "请指定IP地址，格式为：开启代理 [IP地址]，例如：开启代理 192.168.1.100"}
+                        });
                     }
                 } else if (Msg === "关闭代理") {
                     if (proxyProcess) {
@@ -867,6 +898,11 @@ app.post('/getRobotMsg', async (req, res) => {
                     return res.status(200).json({
                         code: "0",
                         message: {aiMsg: "代理已关闭"}
+                    });
+                } else if (Msg === "帮助代理") {
+                    return res.status(200).json({
+                        code: "0",
+                        message: {aiMsg: "代理功能使用说明：\n- 开启代理：自动获取IP地址\n- 开启代理 [IP地址]：手动指定IP地址，例如：开启代理 192.168.1.100\n- 关闭代理：关闭代理服务\n- 帮助代理：显示此帮助信息"}
                     });
                 }
             } catch (err) {

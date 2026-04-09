@@ -205,18 +205,25 @@ if __name__ == '__main__':
         print("等待输入配置...")
         sys.stdout.flush()
         
-        # 从标准输入读取选项和端口
-        auto_ip = sys.stdin.readline().strip()
-        print(f"收到IP选项: {auto_ip}")
+        # 从标准输入读取IP类型、自定义IP和端口
+        ip_type = sys.stdin.readline().strip()
+        print(f"收到IP类型: {ip_type}")
+        sys.stdout.flush()
+        
+        custom_ip = sys.stdin.readline().strip()
+        print(f"收到自定义IP: {custom_ip}")
         sys.stdout.flush()
         
         port = int(sys.stdin.readline().strip())
         print(f"收到端口: {port}")
         sys.stdout.flush()
         
-        if auto_ip == "1":
+        if ip_type == "auto":
             IP = socket.gethostbyname(socket.gethostname())
             print(f"自动获取IP: {IP}")
+        elif ip_type == "manual":
+            IP = custom_ip
+            print(f"使用手动指定IP: {IP}")
         else:
             IP = "127.0.0.1"
             print(f"使用默认IP: {IP}")
